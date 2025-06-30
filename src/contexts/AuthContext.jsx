@@ -26,6 +26,13 @@ export const AuthProvider = ({ children }) => {
   const [userProfile, setUserProfile] = useState(null)
 
   useEffect(() => {
+    // Check if Firebase is properly initialized
+    if (!auth) {
+      console.warn("Firebase Auth not initialized - running in demo mode")
+      setLoading(false)
+      return
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setUser(user)
@@ -51,6 +58,39 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       setLoading(true)
+      
+      // Demo mode login
+      if (!auth) {
+        // Check demo credentials
+        if ((email === 'admin@assinfoso-kccr.org' && password === 'admin123') ||
+            (email === 'member@assinfoso-kccr.org' && password === 'member123')) {
+          
+          const demoUser = {
+            uid: email === 'admin@assinfoso-kccr.org' ? 'demo-admin' : 'demo-member',
+            email: email,
+            displayName: email === 'admin@assinfoso-kccr.org' ? 'Admin Demo' : 'Member Demo'
+          }
+          
+          const demoProfile = {
+            role: email === 'admin@assinfoso-kccr.org' ? 'admin' : 'member',
+            permissions: email === 'admin@assinfoso-kccr.org' ? 
+              ['read', 'write', 'admin', 'invite'] : 
+              ['read'],
+            name: demoUser.displayName,
+            department: 'Infectious Disease Epidemiology',
+            joinDate: new Date().toISOString()
+          }
+          
+          setUser(demoUser)
+          setUserProfile(demoProfile)
+          toast.success('Successfully logged in! (Demo Mode)')
+          return { user: demoUser }
+        } else {
+          throw new Error('Invalid demo credentials. Use admin@assinfoso-kccr.org/admin123 or member@assinfoso-kccr.org/member123')
+        }
+      }
+      
+      // Real Firebase login
       const result = await signInWithEmailAndPassword(auth, email, password)
       toast.success('Successfully logged in!')
       return result
@@ -64,6 +104,15 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
+      // Demo mode logout
+      if (!auth) {
+        setUser(null)
+        setUserProfile(null)
+        toast.success('Successfully logged out! (Demo Mode)')
+        return
+      }
+      
+      // Real Firebase logout
       await signOut(auth)
       toast.success('Successfully logged out!')
     } catch (error) {
