@@ -6,6 +6,7 @@ import { useAuth } from './contexts/AuthContext'
 import Navbar from './components/layout/Navbar'
 import Sidebar from './components/layout/Sidebar'
 import Footer from './components/layout/Footer'
+import DemoModeNotification from './components/DemoModeNotification'
 
 // Page Components
 import HomePage from './pages/HomePage'
@@ -64,6 +65,7 @@ function App() {
 
   return (
     <div className="App">
+      <DemoModeNotification />
       <Routes>
         {/* Public Routes */}
         <Route 

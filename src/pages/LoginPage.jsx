@@ -168,12 +168,21 @@ const LoginPage = () => {
         </form>
 
         {/* Demo Credentials */}
-        <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <h3 className="text-sm font-medium text-yellow-800 mb-2">Demo Credentials:</h3>
-          <div className="text-xs text-yellow-700 space-y-1">
-            <p><strong>Admin:</strong> admin@assinfoso-kccr.org / admin123</p>
-            <p><strong>Member:</strong> member@assinfoso-kccr.org / member123</p>
+        <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center mb-2">
+            <div className="h-2 w-2 bg-blue-500 rounded-full mr-2"></div>
+            <h3 className="text-sm font-medium text-blue-800">🎭 Demo Mode Active</h3>
           </div>
+          <p className="text-xs text-blue-700 mb-3">
+            Firebase is running in demo mode. Use these credentials to explore the app:
+          </p>
+          <div className="text-xs text-blue-700 space-y-1 bg-blue-100 p-3 rounded">
+            <p><strong>Admin Access:</strong> admin@assinfoso-kccr.org / admin123</p>
+            <p><strong>Member Access:</strong> member@assinfoso-kccr.org / member123</p>
+          </div>
+          <p className="text-xs text-blue-600 mt-2 italic">
+            For production use, configure real Firebase credentials.
+          </p>
         </div>
       </div>
     </div>

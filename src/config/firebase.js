@@ -18,30 +18,44 @@ const firebaseConfig = {
 }
 
 // Check if we're using demo credentials
-const isDemoMode = firebaseConfig.apiKey === "demo-api-key"
+const isDemoMode = firebaseConfig.apiKey === "demo-api-key" || 
+                   firebaseConfig.apiKey === "demo-api-key-replace-with-real" ||
+                   !import.meta.env.VITE_FIREBASE_API_KEY ||
+                   import.meta.env.VITE_FIREBASE_API_KEY.includes('demo')
 
 if (isDemoMode) {
-  console.warn("🚨 Firebase Demo Mode: Using placeholder credentials. Authentication will not work until you configure real Firebase credentials.")
+  console.warn("🚨 Firebase Demo Mode: Skipping Firebase initialization. Authentication will use demo mode.")
 }
 
 // Initialize Firebase
-let app, auth, db, storage, analytics
+let app = null
+let auth = null
+let db = null
+let storage = null
+let analytics = null
 
-try {
-  app = initializeApp(firebaseConfig)
-  
-  // Initialize Firebase services
-  auth = getAuth(app)
-  db = getFirestore(app)
-  storage = getStorage(app)
-  
-  // Only initialize analytics in production with real config
-  if (!isDemoMode && typeof window !== 'undefined') {
-    analytics = getAnalytics(app)
+// Only initialize Firebase with real credentials
+if (!isDemoMode) {
+  try {
+    app = initializeApp(firebaseConfig)
+    
+    // Initialize Firebase services
+    auth = getAuth(app)
+    db = getFirestore(app)
+    storage = getStorage(app)
+    
+    // Only initialize analytics in production with real config
+    if (typeof window !== 'undefined') {
+      analytics = getAnalytics(app)
+    }
+    
+    console.log("✅ Firebase initialized successfully")
+  } catch (error) {
+    console.error("❌ Firebase initialization error:", error)
+    console.warn("Falling back to demo mode")
   }
-} catch (error) {
-  console.error("Firebase initialization error:", error)
-  console.warn("Running in demo mode - Firebase features will be limited")
+} else {
+  console.log("🎭 Running in Firebase demo mode")
 }
 
 export { auth, db, storage, analytics }
