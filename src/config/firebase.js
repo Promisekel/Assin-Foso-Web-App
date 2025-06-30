@@ -8,23 +8,39 @@ import { getAnalytics } from 'firebase/analytics'
 // Your web app's Firebase configuration
 // For Firebase JS SDK v9-compat and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "demo-api-key",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "demo-project.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "demo-project-id",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "demo-project.appspot.com",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "123456789",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:123456789:web:demo-app-id",
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-DEMO123"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 }
 
-// Check if we're using demo credentials
-const isDemoMode = firebaseConfig.apiKey === "demo-api-key" || 
-                   firebaseConfig.apiKey === "demo-api-key-replace-with-real" ||
-                   !import.meta.env.VITE_FIREBASE_API_KEY ||
-                   import.meta.env.VITE_FIREBASE_API_KEY.includes('demo')
+// Validate required environment variables
+const requiredEnvVars = [
+  'VITE_FIREBASE_API_KEY',
+  'VITE_FIREBASE_AUTH_DOMAIN', 
+  'VITE_FIREBASE_PROJECT_ID',
+  'VITE_FIREBASE_STORAGE_BUCKET',
+  'VITE_FIREBASE_MESSAGING_SENDER_ID',
+  'VITE_FIREBASE_APP_ID'
+]
+
+const missingEnvVars = requiredEnvVars.filter(envVar => !import.meta.env[envVar])
+
+if (missingEnvVars.length > 0) {
+  console.error('❌ Missing required Firebase environment variables:', missingEnvVars)
+  console.error('Please check your .env file and ensure all Firebase variables are set')
+}
+
+// Check if we're using demo credentials or missing config
+const isDemoMode = !import.meta.env.VITE_FIREBASE_API_KEY || 
+                   import.meta.env.VITE_FIREBASE_API_KEY.includes('demo') ||
+                   missingEnvVars.length > 0
 
 if (isDemoMode) {
-  console.warn("🚨 Firebase Demo Mode: Skipping Firebase initialization. Authentication will use demo mode.")
+  console.warn("🚨 Firebase Demo Mode: Missing or invalid Firebase configuration. Please set up real Firebase credentials.")
 }
 
 // Initialize Firebase
@@ -34,9 +50,9 @@ let db = null
 let storage = null
 let analytics = null
 
-// Only initialize Firebase with real credentials
 if (!isDemoMode) {
   try {
+    // Initialize Firebase app
     app = initializeApp(firebaseConfig)
     
     // Initialize Firebase services
@@ -44,18 +60,18 @@ if (!isDemoMode) {
     db = getFirestore(app)
     storage = getStorage(app)
     
-    // Only initialize analytics in production with real config
-    if (typeof window !== 'undefined') {
+    // Initialize analytics in production
+    if (typeof window !== 'undefined' && import.meta.env.VITE_FIREBASE_MEASUREMENT_ID) {
       analytics = getAnalytics(app)
     }
     
-    console.log("✅ Firebase initialized successfully")
+    console.log("✅ Firebase initialized successfully with project:", firebaseConfig.projectId)
   } catch (error) {
     console.error("❌ Firebase initialization error:", error)
-    console.warn("Falling back to demo mode")
+    console.warn("Check your Firebase configuration and try again")
   }
 } else {
-  console.log("🎭 Running in Firebase demo mode")
+  console.log("🎭 Running in Firebase demo mode - Set up real Firebase credentials to enable authentication")
 }
 
 export { auth, db, storage, analytics }
