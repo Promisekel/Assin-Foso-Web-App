@@ -445,32 +445,13 @@ const Gallery = () => {
     }
   }, [])
 
-  const handleAlbumSelect = (album) => {
-    setSelectedAlbum(album)
-    setLoading(true)
-    // Filter images by album
-    setTimeout(() => {
-      const albumImages = mockImages.filter(img => img.albumId === album.id)
-      setImages(albumImages)
-      setLoading(false)
-    }, 500)
-  }
-
-  const handleImageClick = (image) => {
-    setSelectedImage(image)
-    setShowModal(true)
-  }
-
-  const handleCloseModal = () => {
-    setShowModal(false)
-    setSelectedImage(null)
-  }
-
-  const filteredImages = images.filter(image =>
-    image.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    image.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    image.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
-  )
+  const filteredImages = useMemo(() => {
+    return images.filter(image =>
+      image.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      image.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      image.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
+    )
+  }, [images, searchTerm])
 
   if (!selectedAlbum) {
     return (
