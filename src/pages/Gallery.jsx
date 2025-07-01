@@ -11,12 +11,15 @@ import {
   Share2,
   Eye,
   Upload,
-  FolderPlus
+  FolderPlus,
+  Trash2
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useGallery } from '../contexts/GalleryContext'
 import ImageUpload from '../components/ImageUpload'
+import ImageViewer from '../components/ImageViewer'
 import ErrorBoundary from '../components/ErrorBoundary'
+import toast from 'react-hot-toast'
 
 // Memoized Album Card Component to prevent unnecessary re-renders
 const AlbumCard = React.memo(({ album, index, onSelect, isHovered, onHover, onLeave, onUpload, isAdmin }) => {
@@ -171,7 +174,7 @@ const AlbumCard = React.memo(({ album, index, onSelect, isHovered, onHover, onLe
 })
 
 // Memoized Image Card Component
-const ImageCard = React.memo(({ image, index, onSelect, isHovered, onHover, onLeave }) => {
+const ImageCard = React.memo(({ image, index, onSelect, isHovered, onHover, onLeave, onDelete, isAdmin }) => {
   const [imageLoaded, setImageLoaded] = useState(false)
   const [imageError, setImageError] = useState(false)
   
@@ -196,9 +199,16 @@ const ImageCard = React.memo(({ image, index, onSelect, isHovered, onHover, onLe
     onLeave()
   }, [onLeave])
 
+  const handleDelete = useCallback((e) => {
+    e.stopPropagation() // Prevent opening image viewer
+    if (window.confirm(`Are you sure you want to delete "${image.title}"?`)) {
+      onDelete(image)
+    }
+  }, [image, onDelete])
+
   return (
     <div
-      className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg border border-white/20 cursor-pointer animate-slideInUp overflow-hidden gallery-card prevent-flicker"
+      className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg border border-white/20 cursor-pointer animate-slideInUp overflow-hidden gallery-card prevent-flicker group"
       style={{ 
         animationDelay: `${index * 50}ms`,
         transform: isHovered ? 'scale(1.02)' : 'scale(1)',
@@ -236,6 +246,17 @@ const ImageCard = React.memo(({ image, index, onSelect, isHovered, onHover, onLe
           loading="lazy"
           draggable={false}
         />
+
+        {/* Delete Button - Admin Only */}
+        {isAdmin && (
+          <button
+            onClick={handleDelete}
+            className="absolute top-2 right-2 p-2 bg-red-500/80 hover:bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200 hover:scale-110 z-10"
+            title="Delete image"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
         
         {/* Stable overlay */}
         <div 
@@ -318,6 +339,8 @@ const Gallery = () => {
   const [showImageUpload, setShowImageUpload] = useState(false)
   const [uploadingToAlbum, setUploadingToAlbum] = useState(null)
   const [uploadSuccess, setUploadSuccess] = useState(false)
+  const [showImageViewer, setShowImageViewer] = useState(false)
+  const [currentImageIndex, setCurrentImageIndex] = useState(0)
   
   // Safe auth access
   const auth = useAuth()
@@ -325,7 +348,7 @@ const Gallery = () => {
   
   // Safe gallery context access
   const galleryContext = useGallery()
-  const { albums = [], setAlbums, addImagesToAlbum, getAlbumImages } = galleryContext || {}
+  const { albums = [], setAlbums, addImagesToAlbum, getAlbumImages, deleteImage } = galleryContext || {}
 
   // Safety check for isAdmin function - ensure it returns a boolean
   const isAdminUser = React.useMemo(() => {
@@ -340,6 +363,15 @@ const Gallery = () => {
       return false
     }
   }, [isAdmin])
+
+  // Memoized filtered images - must be defined before handlers that use it
+  const filteredImages = useMemo(() => {
+    return images.filter(image =>
+      image.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      image.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      image.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
+    )
+  }, [images, searchTerm])
 
   // Stable hover handlers with debouncing and throttling to prevent rapid state changes
   const hoverTimeoutRef = useRef(null)
@@ -448,6 +480,56 @@ const Gallery = () => {
     setShowImageUpload(false)
     setUploadingToAlbum(null)
   }, [])
+
+  // Image viewer handlers
+  const handleImageSelect = useCallback((image) => {
+    const imageIndex = filteredImages.findIndex(img => img.id === image.id)
+    setCurrentImageIndex(imageIndex)
+    setSelectedImage(image)
+    setShowImageViewer(true)
+  }, [filteredImages])
+
+  const handleImageViewerClose = useCallback(() => {
+    setShowImageViewer(false)
+    setSelectedImage(null)
+  }, [])
+
+  const handlePreviousImage = useCallback(() => {
+    if (currentImageIndex > 0) {
+      const newIndex = currentImageIndex - 1
+      setCurrentImageIndex(newIndex)
+      setSelectedImage(filteredImages[newIndex])
+    }
+  }, [currentImageIndex, filteredImages])
+
+  const handleNextImage = useCallback(() => {
+    if (currentImageIndex < filteredImages.length - 1) {
+      const newIndex = currentImageIndex + 1
+      setCurrentImageIndex(newIndex)
+      setSelectedImage(filteredImages[newIndex])
+    }
+  }, [currentImageIndex, filteredImages])
+
+  // Delete image handler
+  const handleDeleteImage = useCallback(async (image) => {
+    try {
+      await deleteImage(image.id)
+      
+      // Remove image from current view
+      setImages(prev => prev.filter(img => img.id !== image.id))
+      
+      // Close viewer if this image was being viewed
+      if (selectedImage && selectedImage.id === image.id) {
+        setShowImageViewer(false)
+        setSelectedImage(null)
+      }
+      
+      toast.success(`"${image.title}" deleted successfully`)
+    } catch (error) {
+      console.error('Error deleting image:', error)
+      toast.error('Failed to delete image')
+    }
+  }, [deleteImage, selectedImage])
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -581,14 +663,6 @@ const Gallery = () => {
       }
     }
   }, [])
-
-  const filteredImages = useMemo(() => {
-    return images.filter(image =>
-      image.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      image.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      image.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
-    )
-  }, [images, searchTerm])
 
   if (!selectedAlbum) {
     return (
@@ -747,10 +821,12 @@ const Gallery = () => {
               key={image.id}
               image={image}
               index={index}
-              onSelect={handleImageClick}
+              onSelect={handleImageSelect}
               isHovered={hoveredCard === `image-${image.id}`}
               onHover={handleCardHover}
               onLeave={handleCardLeave}
+              onDelete={handleDeleteImage}
+              isAdmin={isAdminUser}
             />
           ))}
         </div>
@@ -866,6 +942,19 @@ const Gallery = () => {
           albumName={uploadingToAlbum.name}
           onUploadComplete={handleUploadComplete}
           onClose={handleUploadClose}
+        />
+      )}
+
+      {/* Image Viewer Modal */}
+      {showImageViewer && selectedImage && (
+        <ImageViewer
+          image={selectedImage}
+          images={filteredImages}
+          isOpen={showImageViewer}
+          onClose={handleImageViewerClose}
+          onDelete={handleDeleteImage}
+          onPrevious={currentImageIndex > 0 ? handlePreviousImage : undefined}
+          onNext={currentImageIndex < filteredImages.length - 1 ? handleNextImage : undefined}
         />
       )}
     </div>

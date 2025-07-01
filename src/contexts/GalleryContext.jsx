@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react'
+import { storageService } from '../services/FirebaseStorageService'
 
 const GalleryContext = createContext()
 
@@ -36,10 +37,44 @@ export const GalleryProvider = ({ children }) => {
     ))
   }, [])
 
-  // Delete image
-  const deleteImage = useCallback((imageId) => {
-    setUploadedImages(prev => prev.filter(img => img.id !== imageId))
-  }, [])
+  // Delete image with Firebase Storage cleanup
+  const deleteImage = useCallback(async (imageId) => {
+    try {
+      // Find the image to get its storage path
+      const imageToDelete = uploadedImages.find(img => img.id === imageId)
+      
+      if (imageToDelete) {
+        // Delete from Firebase Storage if it's a Firebase image
+        if (imageToDelete.isFirebase && imageToDelete.storagePath) {
+          try {
+            await storageService.deleteImage(imageToDelete.storagePath)
+            console.log('🗑️ Image deleted from Firebase Storage')
+          } catch (error) {
+            console.error('Error deleting from Firebase Storage:', error)
+            // Continue with local deletion even if Firebase delete fails
+          }
+        }
+        
+        // Remove from local state
+        setUploadedImages(prev => prev.filter(img => img.id !== imageId))
+        
+        // Update album image count
+        setAlbums(prev => prev.map(album => 
+          album.id === imageToDelete.albumId 
+            ? { ...album, imageCount: Math.max(0, album.imageCount - 1) }
+            : album
+        ))
+        
+        console.log('✅ Image deleted successfully')
+        return true
+      }
+      
+      return false
+    } catch (error) {
+      console.error('Error deleting image:', error)
+      throw error
+    }
+  }, [uploadedImages])
 
   const value = {
     albums,

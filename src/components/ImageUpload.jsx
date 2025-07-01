@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react'
 import { Upload, X, Image as ImageIcon, AlertCircle, Check, Loader } from 'lucide-react'
+import { storageService } from '../services/FirebaseStorageService'
 
 const ImageUpload = ({ albumId, albumName, onUploadComplete, onClose }) => {
   const [files, setFiles] = useState([])
@@ -59,28 +60,11 @@ const ImageUpload = ({ albumId, albumName, onUploadComplete, onClose }) => {
     })
   }, [])
 
-  // Simulate upload progress (replace with actual upload logic)
-  const uploadFile = async (fileItem) => {
-    return new Promise((resolve) => {
-      let progress = 0
-      const interval = setInterval(() => {
-        progress += Math.random() * 30
-        if (progress >= 100) {
-          progress = 100
-          clearInterval(interval)
-          resolve()
-        }
-        setUploadProgress(prev => ({
-          ...prev,
-          [fileItem.id]: progress
-        }))
-      }, 200)
-    })
-  }
-
-  // Upload all files
+  // Upload all files using Firebase Storage
   const handleUpload = async () => {
-    if (files.length === 0) return
+    if (files.length === 0) {
+      return
+    }
 
     setUploading(true)
     const pendingFiles = files.filter(f => f.status === 'pending')
@@ -91,39 +75,75 @@ const ImageUpload = ({ albumId, albumName, onUploadComplete, onClose }) => {
         f.status === 'pending' ? { ...f, status: 'uploading' } : f
       ))
 
-      // Upload files concurrently
-      await Promise.all(
-        pendingFiles.map(async (fileItem) => {
-          try {
-            await uploadFile(fileItem)
-            setFiles(prev => prev.map(f => 
-              f.id === fileItem.id ? { ...f, status: 'success' } : f
-            ))
-          } catch (error) {
-            setFiles(prev => prev.map(f => 
-              f.id === fileItem.id ? { ...f, status: 'error' } : f
-            ))
+      // Upload files using Firebase Storage Service
+      console.log('🚀 Starting upload for', pendingFiles.length, 'files...')
+      
+      const uploadResults = await storageService.uploadMultipleImages(
+        pendingFiles.map(f => f.file),
+        albumId,
+        (current, total, filename) => {
+          // Update progress for current file - immediate feedback
+          const currentFile = pendingFiles.find(f => f.file.name === filename)
+          if (currentFile) {
+            const progress = Math.min(100, (current / total) * 100)
+            console.log(`📈 Progress for ${filename}: ${progress}%`)
+            
+            setUploadProgress(prev => ({
+              ...prev,
+              [currentFile.id]: progress
+            }))
+            
+            // Mark file as success immediately when completed
+            if (progress >= 100) {
+              setFiles(prev => prev.map(f => 
+                f.id === currentFile.id ? { ...f, status: 'success' } : f
+              ))
+            }
           }
-        })
+        }
       )
 
-      // Simulate creating image records that are compatible with gallery
-      const uploadedImages = pendingFiles.map((fileItem, index) => ({
-        id: Date.now() + index + Math.random(), // Ensure unique ID
-        albumId: albumId,
-        title: fileItem.name.replace(/\.[^/.]+$/, ""), // Remove extension
-        description: `Uploaded to ${albumName} album`,
-        url: fileItem.preview, // In real app, this would be the server URL
-        thumbnail: fileItem.preview,
-        tags: ['uploaded', albumName.toLowerCase().replace(/\s+/g, '-'), 'new'],
-        uploadedBy: 'Current User', // In real app, get from auth context
-        uploadedAt: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
-        views: 0,
-        likes: 0,
-        size: fileItem.size,
-        type: fileItem.file.type
-      }))
+      console.log('✅ Upload results:', uploadResults)
+
+      // Update file statuses based on results
+      uploadResults.forEach((result, index) => {
+        const fileItem = pendingFiles[index]
+        setFiles(prev => prev.map(f => 
+          f.id === fileItem.id ? { 
+            ...f, 
+            status: result.success ? 'success' : 'error',
+            error: result.error 
+          } : f
+        ))
+      })
+
+      // Create image records compatible with gallery
+      const uploadedImages = uploadResults
+        .filter(result => result.success)
+        .map((result, index) => {
+          const now = new Date()
+          const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, -5)
+          
+          return {
+            id: Date.now() + index + Math.random(),
+            albumId: albumId,
+            title: `IMG_${timestamp}`, // Use current date/time as title
+            description: `Uploaded to ${albumName} album on ${now.toLocaleDateString()}`,
+            url: result.url,
+            thumbnail: result.url,
+            storagePath: result.path, // Store Firebase path for deletion
+            fileName: result.fileName,
+            tags: ['uploaded', albumName.toLowerCase().replace(/\s+/g, '-'), 'new'],
+            uploadedBy: 'Current User',
+            uploadedAt: now.toISOString(),
+            createdAt: now.toISOString(),
+            views: 0,
+            likes: 0,
+            size: result.size,
+            type: result.type,
+            isFirebase: !result.isDemo // Track if it's stored in Firebase
+          }
+        })
 
       // Call upload complete callback
       if (onUploadComplete && typeof onUploadComplete === 'function') {
@@ -143,18 +163,61 @@ const ImageUpload = ({ albumId, albumName, onUploadComplete, onClose }) => {
             console.error('Error in onClose callback:', error)
           }
         }
-      }, 1500)
+      }, 200) // Super fast close - just 200ms to show success
 
     } catch (error) {
       console.error('Upload failed:', error)
       // Mark failed uploads
       setFiles(prev => prev.map(f => 
-        f.status === 'uploading' ? { ...f, status: 'error' } : f
+        f.status === 'uploading' ? { ...f, status: 'error', error: error.message } : f
       ))
     } finally {
       setUploading(false)
     }
   }
+
+  // Quick upload option - skip the delay and close immediately on success
+  const handleQuickUpload = useCallback(() => {
+    if (onUploadComplete && typeof onUploadComplete === 'function') {
+      // Get successful uploads
+      const successfulFiles = files.filter(f => f.status === 'success')
+      if (successfulFiles.length > 0) {
+        try {
+          // Create quick image records for successful uploads
+          const quickImages = successfulFiles.map((fileItem, index) => {
+            const now = new Date()
+            const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, -5)
+            
+            return {
+              id: Date.now() + index + Math.random(),
+              albumId: albumId,
+              title: `IMG_${timestamp}`,
+              description: `Uploaded to ${albumName} album`,
+              url: fileItem.preview,
+              thumbnail: fileItem.preview,
+              tags: ['uploaded', 'quick'],
+              uploadedBy: 'Current User',
+              uploadedAt: now.toISOString(),
+              createdAt: now.toISOString(),
+              views: 0,
+              likes: 0,
+              size: fileItem.size,
+              type: fileItem.file.type,
+              isDemo: true
+            }
+          })
+          
+          onUploadComplete(quickImages)
+        } catch (error) {
+          console.error('Error in quick upload:', error)
+        }
+      }
+    }
+    
+    if (onClose && typeof onClose === 'function') {
+      onClose()
+    }
+  }, [files, albumId, albumName, onUploadComplete, onClose])
 
   // Format file size
   const formatFileSize = (bytes) => {
@@ -327,6 +390,18 @@ const ImageUpload = ({ albumId, albumName, onUploadComplete, onClose }) => {
             >
               Cancel
             </button>
+            
+            {/* Quick Upload Button - for immediate results */}
+            {files.some(f => f.status === 'success') && (
+              <button
+                onClick={handleQuickUpload}
+                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center"
+              >
+                <Check className="h-4 w-4 mr-2" />
+                Use Uploaded ({files.filter(f => f.status === 'success').length})
+              </button>
+            )}
+            
             <button
               onClick={handleUpload}
               disabled={files.length === 0 || uploading || files.every(f => f.status !== 'pending')}
