@@ -16,7 +16,6 @@ import {
 import { useAuth } from '../contexts/AuthContext'
 import { useGallery } from '../contexts/GalleryContext'
 import ImageUpload from '../components/ImageUpload'
-import ErrorBoundary from '../components/ErrorBoundary'
 
 // Memoized Album Card Component to prevent unnecessary re-renders
 const AlbumCard = React.memo(({ album, index, onSelect, isHovered, onHover, onLeave, onUpload, isAdmin }) => {
@@ -118,7 +117,7 @@ const AlbumCard = React.memo(({ album, index, onSelect, isHovered, onHover, onLe
         </div>
         
         {/* Upload button - Show on hover for admins */}
-        {isAdmin && (
+        {isAdminUser && (
           <div 
             className="absolute top-3 left-3 gallery-badge prevent-flicker"
             style={{
@@ -318,28 +317,13 @@ const Gallery = () => {
   const [showImageUpload, setShowImageUpload] = useState(false)
   const [uploadingToAlbum, setUploadingToAlbum] = useState(null)
   const [uploadSuccess, setUploadSuccess] = useState(false)
-  
-  // Safe auth access
-  const auth = useAuth()
-  const { isAdmin } = auth || {}
-  
-  // Safe gallery context access
+  const [uploadInProgress, setUploadInProgress] = useState(false)
+  const { isAdmin } = useAuth()
   const galleryContext = useGallery()
-  const { albums = [], setAlbums, addImagesToAlbum, getAlbumImages } = galleryContext || {}
+  const { albums = [], setAlbums, uploadedImages = [], addImagesToAlbum, getAlbumImages } = galleryContext || {}
 
-  // Safety check for isAdmin function - ensure it returns a boolean
-  const isAdminUser = React.useMemo(() => {
-    try {
-      if (typeof isAdmin === 'function') {
-        const result = isAdmin()
-        return Boolean(result)
-      }
-      return false
-    } catch (error) {
-      console.error('Error checking admin status:', error)
-      return false
-    }
-  }, [isAdmin])
+  // Safety check for isAdmin function
+  const isAdminUser = typeof isAdmin === 'function' ? isAdmin() : false
 
   // Stable hover handlers with debouncing and throttling to prevent rapid state changes
   const hoverTimeoutRef = useRef(null)
@@ -382,7 +366,7 @@ const Gallery = () => {
       setImages(allImages)
       setLoading(false)
     }, 500)
-  }, [getAlbumImages])
+  }, [getAlbumImages, mockImages])
 
   const handleImageClick = useCallback((image) => {
     setSelectedImage(image)
@@ -398,55 +382,45 @@ const Gallery = () => {
   const handleUploadClick = useCallback((album = null) => {
     setUploadingToAlbum(album || selectedAlbum)
     setShowImageUpload(true)
+    setUploadInProgress(true)
   }, [selectedAlbum])
 
   const handleUploadComplete = useCallback((uploadedImages) => {
     try {
-      console.log('🖼️ Upload completed with images:', uploadedImages)
-      console.log('📁 Uploading to album:', uploadingToAlbum)
-      console.log('🎯 Current selected album:', selectedAlbum)
-      console.log('📚 Available albums:', albums)
-      
+      // Add uploaded images to the gallery context
       if (uploadingToAlbum && Array.isArray(uploadedImages) && addImagesToAlbum) {
-        console.log('✅ Adding images to album...')
         addImagesToAlbum(uploadingToAlbum.id, uploadedImages)
         
         // If we're currently viewing this album, update the displayed images immediately
         if (selectedAlbum && selectedAlbum.id === uploadingToAlbum.id) {
-          console.log('🔄 Updating current album view with new images')
           setImages(prev => {
             // Avoid duplicates by checking if images already exist
             const existingIds = prev.map(img => img.id)
             const newImages = uploadedImages.filter(img => !existingIds.includes(img.id))
-            console.log('➕ Adding new images:', newImages.length)
             return [...prev, ...newImages]
           })
         }
         
         // Show success message
-        console.log('🎉 Showing success message')
         setUploadSuccess(true)
+        setUploadInProgress(false)
         setTimeout(() => setUploadSuccess(false), 3000)
-      } else {
-        console.warn('⚠️ Missing required data for upload:', {
-          uploadingToAlbum: !!uploadingToAlbum,
-          uploadedImages: Array.isArray(uploadedImages),
-          addImagesToAlbum: !!addImagesToAlbum
-        })
       }
+      
+      setShowImageUpload(false)
+      setUploadingToAlbum(null)
     } catch (error) {
-      console.error('❌ Error handling upload completion:', error)
-    } finally {
-      // Always clean up the upload state
-      console.log('🧹 Cleaning up upload state')
+      console.error('Error handling upload completion:', error)
+      setUploadInProgress(false)
       setShowImageUpload(false)
       setUploadingToAlbum(null)
     }
-  }, [uploadingToAlbum, addImagesToAlbum, selectedAlbum, albums])
+  }, [uploadingToAlbum, addImagesToAlbum, selectedAlbum])
 
   const handleUploadClose = useCallback(() => {
     setShowImageUpload(false)
     setUploadingToAlbum(null)
+    setUploadInProgress(false)
   }, [])
 
   // Cleanup timeout on unmount
@@ -554,22 +528,12 @@ const Gallery = () => {
 
   useEffect(() => {
     // Load mock albums into context if not already loaded
-    try {
-      if (albums.length === 0 && setAlbums && mockAlbums.length > 0) {
-        setLoading(true)
-        setTimeout(() => {
-          try {
-            setAlbums(mockAlbums)
-          } catch (error) {
-            console.error('Error setting albums:', error)
-          } finally {
-            setLoading(false)
-          }
-        }, 1000)
-      }
-    } catch (error) {
-      console.error('Error in albums loading effect:', error)
-      setLoading(false)
+    if (albums.length === 0 && setAlbums) {
+      setLoading(true)
+      setTimeout(() => {
+        setAlbums(mockAlbums)
+        setLoading(false)
+      }, 1000)
     }
   }, [mockAlbums, albums.length, setAlbums])
 
@@ -872,13 +836,4 @@ const Gallery = () => {
   )
 }
 
-// Wrap the Gallery component with ErrorBoundary
-const GalleryWithErrorBoundary = () => {
-  return (
-    <ErrorBoundary>
-      <Gallery />
-    </ErrorBoundary>
-  )
-}
-
-export default GalleryWithErrorBoundary
+export default Gallery

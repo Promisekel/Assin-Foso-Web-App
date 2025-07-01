@@ -2,6 +2,7 @@ import React from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 import { NavigationProvider, useNavigation } from './contexts/NavigationContext'
+import { GalleryProvider } from './contexts/GalleryContext'
 
 // Layout Components
 import Navbar from './components/layout/Navbar'
@@ -95,9 +96,10 @@ function App() {
 
   return (
     <NavigationProvider>
-      <div className="App">
-        <DemoModeNotification />
-        <Routes>
+      <GalleryProvider>
+        <div className="App">
+          <DemoModeNotification />
+          <Routes>
         {/* Public Routes */}
         <Route 
           path="/login" 
@@ -233,6 +235,7 @@ function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       </div>
+      </GalleryProvider>
     </NavigationProvider>
   )
 }

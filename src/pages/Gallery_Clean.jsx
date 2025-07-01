@@ -16,7 +16,6 @@ import {
 import { useAuth } from '../contexts/AuthContext'
 import { useGallery } from '../contexts/GalleryContext'
 import ImageUpload from '../components/ImageUpload'
-import ErrorBoundary from '../components/ErrorBoundary'
 
 // Memoized Album Card Component to prevent unnecessary re-renders
 const AlbumCard = React.memo(({ album, index, onSelect, isHovered, onHover, onLeave, onUpload, isAdmin }) => {
@@ -318,28 +317,12 @@ const Gallery = () => {
   const [showImageUpload, setShowImageUpload] = useState(false)
   const [uploadingToAlbum, setUploadingToAlbum] = useState(null)
   const [uploadSuccess, setUploadSuccess] = useState(false)
-  
-  // Safe auth access
-  const auth = useAuth()
-  const { isAdmin } = auth || {}
-  
-  // Safe gallery context access
+  const { isAdmin } = useAuth()
   const galleryContext = useGallery()
   const { albums = [], setAlbums, addImagesToAlbum, getAlbumImages } = galleryContext || {}
 
-  // Safety check for isAdmin function - ensure it returns a boolean
-  const isAdminUser = React.useMemo(() => {
-    try {
-      if (typeof isAdmin === 'function') {
-        const result = isAdmin()
-        return Boolean(result)
-      }
-      return false
-    } catch (error) {
-      console.error('Error checking admin status:', error)
-      return false
-    }
-  }, [isAdmin])
+  // Safety check for isAdmin function
+  const isAdminUser = typeof isAdmin === 'function' ? isAdmin() : false
 
   // Stable hover handlers with debouncing and throttling to prevent rapid state changes
   const hoverTimeoutRef = useRef(null)
@@ -401,48 +384,27 @@ const Gallery = () => {
   }, [selectedAlbum])
 
   const handleUploadComplete = useCallback((uploadedImages) => {
-    try {
-      console.log('🖼️ Upload completed with images:', uploadedImages)
-      console.log('📁 Uploading to album:', uploadingToAlbum)
-      console.log('🎯 Current selected album:', selectedAlbum)
-      console.log('📚 Available albums:', albums)
+    if (uploadingToAlbum && Array.isArray(uploadedImages) && addImagesToAlbum) {
+      addImagesToAlbum(uploadingToAlbum.id, uploadedImages)
       
-      if (uploadingToAlbum && Array.isArray(uploadedImages) && addImagesToAlbum) {
-        console.log('✅ Adding images to album...')
-        addImagesToAlbum(uploadingToAlbum.id, uploadedImages)
-        
-        // If we're currently viewing this album, update the displayed images immediately
-        if (selectedAlbum && selectedAlbum.id === uploadingToAlbum.id) {
-          console.log('🔄 Updating current album view with new images')
-          setImages(prev => {
-            // Avoid duplicates by checking if images already exist
-            const existingIds = prev.map(img => img.id)
-            const newImages = uploadedImages.filter(img => !existingIds.includes(img.id))
-            console.log('➕ Adding new images:', newImages.length)
-            return [...prev, ...newImages]
-          })
-        }
-        
-        // Show success message
-        console.log('🎉 Showing success message')
-        setUploadSuccess(true)
-        setTimeout(() => setUploadSuccess(false), 3000)
-      } else {
-        console.warn('⚠️ Missing required data for upload:', {
-          uploadingToAlbum: !!uploadingToAlbum,
-          uploadedImages: Array.isArray(uploadedImages),
-          addImagesToAlbum: !!addImagesToAlbum
+      // If we're currently viewing this album, update the displayed images immediately
+      if (selectedAlbum && selectedAlbum.id === uploadingToAlbum.id) {
+        setImages(prev => {
+          // Avoid duplicates by checking if images already exist
+          const existingIds = prev.map(img => img.id)
+          const newImages = uploadedImages.filter(img => !existingIds.includes(img.id))
+          return [...prev, ...newImages]
         })
       }
-    } catch (error) {
-      console.error('❌ Error handling upload completion:', error)
-    } finally {
-      // Always clean up the upload state
-      console.log('🧹 Cleaning up upload state')
-      setShowImageUpload(false)
-      setUploadingToAlbum(null)
+      
+      // Show success message
+      setUploadSuccess(true)
+      setTimeout(() => setUploadSuccess(false), 3000)
     }
-  }, [uploadingToAlbum, addImagesToAlbum, selectedAlbum, albums])
+    
+    setShowImageUpload(false)
+    setUploadingToAlbum(null)
+  }, [uploadingToAlbum, addImagesToAlbum, selectedAlbum])
 
   const handleUploadClose = useCallback(() => {
     setShowImageUpload(false)
@@ -554,22 +516,12 @@ const Gallery = () => {
 
   useEffect(() => {
     // Load mock albums into context if not already loaded
-    try {
-      if (albums.length === 0 && setAlbums && mockAlbums.length > 0) {
-        setLoading(true)
-        setTimeout(() => {
-          try {
-            setAlbums(mockAlbums)
-          } catch (error) {
-            console.error('Error setting albums:', error)
-          } finally {
-            setLoading(false)
-          }
-        }, 1000)
-      }
-    } catch (error) {
-      console.error('Error in albums loading effect:', error)
-      setLoading(false)
+    if (albums.length === 0 && setAlbums) {
+      setLoading(true)
+      setTimeout(() => {
+        setAlbums(mockAlbums)
+        setLoading(false)
+      }, 1000)
     }
   }, [mockAlbums, albums.length, setAlbums])
 
@@ -872,13 +824,4 @@ const Gallery = () => {
   )
 }
 
-// Wrap the Gallery component with ErrorBoundary
-const GalleryWithErrorBoundary = () => {
-  return (
-    <ErrorBoundary>
-      <Gallery />
-    </ErrorBoundary>
-  )
-}
-
-export default GalleryWithErrorBoundary
+export default Gallery

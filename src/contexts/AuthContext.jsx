@@ -200,6 +200,14 @@ export const AuthProvider = ({ children }) => {
   }
 
   const isAdmin = () => {
+    // In demo mode (no Firebase), always return true for admin privileges
+    if (!isFirebaseConfigured) {
+      return true
+    }
+    // If no user is logged in, return false
+    if (!user) {
+      return false
+    }
     return userProfile?.role === 'admin'
   }
 
