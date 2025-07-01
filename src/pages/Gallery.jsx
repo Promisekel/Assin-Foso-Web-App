@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { 
   Plus, 
   Search, 
@@ -24,7 +24,19 @@ const Gallery = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(false)
   const [showModal, setShowModal] = useState(false)
+  const [hoveredCard, setHoveredCard] = useState(null)
   const { isAdmin } = useAuth()
+
+  // Stable hover handlers with debouncing to prevent rapid state changes
+  const handleCardHover = useCallback((cardId) => {
+    // Small delay to prevent rapid hover state changes
+    setTimeout(() => setHoveredCard(cardId), 50)
+  }, [])
+
+  const handleCardLeave = useCallback(() => {
+    // Immediate leave to prevent lingering hover states
+    setHoveredCard(null)
+  }, [])
 
   // Mock data - replace with Netlify Large Media or Cloudinary integration
   const mockAlbums = [
@@ -141,23 +153,25 @@ const Gallery = () => {
 
   if (!selectedAlbum) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 animate-fadeIn">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between animate-slideInUp">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Photo Gallery</h1>
-            <p className="text-gray-600 mt-1">
-              Explore our research activities through images
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-primary-600 to-purple-600 bg-clip-text text-transparent">
+              Photo Gallery
+            </h1>
+            <p className="text-gray-600 mt-2">
+              Explore our research activities through beautiful imagery
             </p>
           </div>
           {isAdmin() && (
-            <div className="flex space-x-3 mt-4 md:mt-0">
-              <button className="btn-secondary">
-                <FolderPlus className="h-4 w-4 mr-2" />
+            <div className="flex space-x-3 mt-4 md:mt-0 animate-slideInRight">
+              <button className="btn-secondary hover:scale-105 transition-transform duration-200 group">
+                <FolderPlus className="h-4 w-4 mr-2 group-hover:rotate-12 transition-transform" />
                 New Album
               </button>
-              <button className="btn-primary">
-                <Upload className="h-4 w-4 mr-2" />
+              <button className="btn-primary hover:scale-105 transition-transform duration-200 group shadow-lg hover:shadow-xl">
+                <Upload className="h-4 w-4 mr-2 group-hover:-translate-y-1 transition-transform" />
                 Upload Images
               </button>
             </div>
@@ -167,46 +181,98 @@ const Gallery = () => {
         {/* Albums Grid */}
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+            <div className="relative">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+              <div className="absolute inset-0 rounded-full border-2 border-primary-200 animate-pulse"></div>
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {albums.map((album) => (
-              <div
-                key={album.id}
-                className="bg-white rounded-lg shadow-md border border-gray-200 hover:shadow-lg transition-all duration-300 cursor-pointer transform hover:scale-105"
-                onClick={() => handleAlbumSelect(album)}
-              >
-                {/* Album Cover */}
-                <div className="relative h-48 bg-gray-200 rounded-t-lg overflow-hidden">
-                  <img
-                    src={album.coverImage}
-                    alt={album.name}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      e.target.src = '/placeholder-image.jpg'
-                    }}
-                  />
-                  <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-20 transition-all duration-300 flex items-center justify-center">
-                    <Eye className="h-8 w-8 text-white opacity-0 hover:opacity-100 transition-opacity" />
+            {albums.map((album, index) => {
+              const isHovered = hoveredCard === `album-${album.id}`
+              return (
+                <div
+                  key={album.id}
+                  className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg border border-white/20 cursor-pointer animate-slideInUp overflow-hidden gallery-card prevent-flicker"
+                  style={{ 
+                    animationDelay: `${index * 100}ms`,
+                    transform: isHovered ? 'scale(1.02)' : 'scale(1)',
+                    boxShadow: isHovered 
+                      ? '0 25px 50px -12px rgba(0, 0, 0, 0.25)' 
+                      : '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                    transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                  }}
+                  onClick={() => handleAlbumSelect(album)}
+                  onMouseEnter={() => handleCardHover(`album-${album.id}`)}
+                  onMouseLeave={handleCardLeave}
+                >
+                  {/* Album Cover */}
+                  <div className="relative h-48 bg-gradient-to-br from-gray-100 to-gray-200 rounded-t-xl overflow-hidden">
+                    <img
+                      src={album.coverImage}
+                      alt={album.name}
+                      className="w-full h-full object-cover gallery-image"
+                      style={{
+                        transform: isHovered ? 'scale(1.05)' : 'scale(1)',
+                        transition: 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
+                      }}
+                      onError={(e) => {
+                        e.target.src = '/placeholder-image.jpg'
+                      }}
+                      loading="lazy"
+                      draggable={false}
+                    />
+                    {/* Stable overlay */}
+                    <div 
+                      className="absolute inset-0 gallery-overlay prevent-flicker"
+                      style={{ 
+                        backgroundColor: isHovered ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0)',
+                        transition: 'background-color 0.3s ease-in-out'
+                      }}
+                    >
+                      <div className="flex items-center justify-center h-full">
+                        <Eye 
+                          className="h-8 w-8 text-white drop-shadow-lg gallery-badge"
+                          style={{
+                            opacity: isHovered ? 1 : 0,
+                            transition: 'opacity 0.3s ease-in-out'
+                          }}
+                        />
+                      </div>
+                    </div>
+                    {/* Photo count badge - Always visible */}
+                    <div className="absolute top-3 right-3 bg-primary-500/90 text-white text-xs font-semibold px-2 py-1 rounded-full shadow-lg backdrop-blur-sm stable-text">
+                      {album.imageCount} photos
+                    </div>
                   </div>
-                </div>
 
-                {/* Album Info */}
-                <div className="p-4">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                    {album.name}
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-3">
-                    {album.description}
-                  </p>
-                  <div className="flex items-center justify-between text-sm text-gray-500">
-                    <span>{album.imageCount} photos</span>
-                    <span>{new Date(album.createdAt).toLocaleDateString()}</span>
+                  {/* Album Info - Stable positioning */}
+                  <div className="p-5 bg-white gallery-content">
+                    <h3 
+                      className="text-lg font-bold mb-2 gallery-title"
+                      style={{
+                        color: isHovered ? '#2563eb' : '#111827',
+                        transition: 'color 0.2s ease-in-out'
+                      }}
+                    >
+                      {album.name}
+                    </h3>
+                    <p className="text-sm text-gray-600 mb-4 stable-text">
+                      {album.description}
+                    </p>
+                    <div className="flex items-center justify-between text-sm text-gray-500 gallery-stats">
+                      <span className="flex items-center stable-text">
+                        <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
+                        {album.imageCount} photos
+                      </span>
+                      <span className="text-xs bg-gray-100 px-2 py-1 rounded-full stable-text">
+                        {new Date(album.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
@@ -214,18 +280,21 @@ const Gallery = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fadeIn pt-4">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between animate-slideInUp">
         <div className="flex items-center space-x-4">
           <button
             onClick={() => setSelectedAlbum(null)}
-            className="text-primary-600 hover:text-primary-700 font-medium"
+            className="text-primary-600 hover:text-primary-700 font-medium flex items-center space-x-2 hover:scale-105 transition-all duration-200"
           >
-            ← Back to Albums
+            <span>←</span>
+            <span>Back to Albums</span>
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{selectedAlbum.name}</h1>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-primary-600 to-purple-600 bg-clip-text text-transparent">
+              {selectedAlbum.name}
+            </h1>
             <p className="text-gray-600 mt-1">{selectedAlbum.description}</p>
           </div>
         </div>
@@ -254,19 +323,19 @@ const Gallery = () => {
       </div>
 
       {/* Search and Filter */}
-      <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
+      <div className="bg-white/80 backdrop-blur-sm p-4 rounded-xl shadow-lg border border-white/20 animate-slideInUp" style={{ animationDelay: '200ms' }}>
         <div className="flex flex-col md:flex-row md:items-center md:space-x-4 space-y-3 md:space-y-0">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-primary-500 transition-colors" />
             <input
               type="text"
               placeholder="Search photos..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl leading-5 bg-white/50 backdrop-blur-sm placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 focus:bg-white sm:text-sm transition-all duration-200"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <button className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-gray-50 border border-gray-300 rounded-lg hover:bg-gray-100">
+          <button className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-gray-50/80 backdrop-blur-sm border border-gray-200 rounded-xl hover:bg-gray-100 hover:scale-105 transition-all duration-200">
             <Filter className="h-4 w-4 mr-2" />
             Filter
           </button>
@@ -279,43 +348,101 @@ const Gallery = () => {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
         </div>
       ) : viewMode === 'grid' ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredImages.map((image) => (
-            <div
-              key={image.id}
-              className="relative bg-white rounded-lg shadow-md border border-gray-200 hover:shadow-lg transition-all duration-300 cursor-pointer transform hover:scale-105"
-              onClick={() => handleImageClick(image)}
-            >
-              <div className="relative h-48 bg-gray-200 rounded-t-lg overflow-hidden">
-                <img
-                  src={image.thumbnail}
-                  alt={image.title}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    e.target.src = '/placeholder-image.jpg'
-                  }}
-                />
-                <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-40 transition-all duration-300 flex items-center justify-center">
-                  <Eye className="h-8 w-8 text-white opacity-0 hover:opacity-100 transition-opacity" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {filteredImages.map((image, index) => {
+            const isHovered = hoveredCard === `image-${image.id}`
+            return (
+              <div
+                key={image.id}
+                className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg border border-white/20 cursor-pointer animate-slideInUp overflow-hidden gallery-card prevent-flicker"
+                style={{ 
+                  animationDelay: `${index * 50}ms`,
+                  transform: isHovered ? 'scale(1.02)' : 'scale(1)',
+                  boxShadow: isHovered 
+                    ? '0 25px 50px -12px rgba(0, 0, 0, 0.25)' 
+                    : '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                  transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                }}
+                onClick={() => handleImageClick(image)}
+                onMouseEnter={() => handleCardHover(`image-${image.id}`)}
+                onMouseLeave={handleCardLeave}
+              >
+                <div className="relative h-48 bg-gradient-to-br from-gray-100 to-gray-200 rounded-t-xl overflow-hidden">
+                  <img
+                    src={image.thumbnail}
+                    alt={image.title}
+                    className="w-full h-full object-cover gallery-image"
+                    style={{
+                      transform: isHovered ? 'scale(1.05)' : 'scale(1)',
+                      transition: 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
+                    }}
+                    onError={(e) => {
+                      e.target.src = '/placeholder-image.jpg'
+                    }}
+                    loading="lazy"
+                    draggable={false}
+                  />
+                  {/* Stable overlay */}
+                  <div 
+                    className="absolute inset-0 gallery-overlay prevent-flicker"
+                    style={{ 
+                      backgroundColor: isHovered ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0)',
+                      transition: 'background-color 0.3s ease-in-out'
+                    }}
+                  >
+                    <div className="flex items-center justify-center h-full">
+                      <Eye 
+                        className="h-8 w-8 text-white drop-shadow-lg gallery-badge"
+                        style={{
+                          opacity: isHovered ? 1 : 0,
+                          transition: 'opacity 0.3s ease-in-out'
+                        }}
+                      />
+                    </div>
+                  </div>
+                  {/* Tags - Fixed positioning */}
+                  <div 
+                    className="absolute bottom-2 left-2 flex flex-wrap gap-1 gallery-badge prevent-flicker"
+                    style={{
+                      opacity: isHovered ? 1 : 0,
+                      transition: 'opacity 0.3s ease-in-out'
+                    }}
+                  >
+                    {image.tags.slice(0, 2).map((tag, tagIndex) => (
+                      <span
+                        key={tagIndex}
+                        className="text-xs bg-primary-500/90 text-white px-2 py-1 rounded-full font-medium shadow-lg backdrop-blur-sm stable-text"
+                      >
+                        #{tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                {/* Fixed title area */}
+                <div className="p-4 bg-white gallery-content">
+                  <h3 
+                    className="font-semibold text-sm mb-2 gallery-title"
+                    style={{
+                      color: isHovered ? '#2563eb' : '#111827',
+                      transition: 'color 0.2s ease-in-out'
+                    }}
+                  >
+                    {image.title}
+                  </h3>
+                  <div className="flex items-center justify-between text-xs text-gray-500 gallery-stats">
+                    <span className="flex items-center stable-text">
+                      <Eye className="h-3 w-3 mr-1" />
+                      {image.views}
+                    </span>
+                    <span className="flex items-center stable-text">
+                      <Heart className="h-3 w-3 mr-1" />
+                      {image.likes}
+                    </span>
+                  </div>
                 </div>
               </div>
-              <div className="p-3">
-                <h3 className="font-medium text-gray-900 text-sm mb-1 truncate">
-                  {image.title}
-                </h3>
-                <div className="flex items-center justify-between text-xs text-gray-500">
-                  <span className="flex items-center">
-                    <Eye className="h-3 w-3 mr-1" />
-                    {image.views}
-                  </span>
-                  <span className="flex items-center">
-                    <Heart className="h-3 w-3 mr-1" />
-                    {image.likes}
-                  </span>
-                </div>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       ) : (
         <div className="bg-white rounded-lg shadow-md border border-gray-200">

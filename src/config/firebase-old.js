@@ -1,4 +1,14 @@
-// Import the functions you need from the Firebase v10 SDK
+// Import the functions console.log(`🔥 Firebase Configuration Status: ${isFirebaseConfigured ? 'PRODUCTION' : 'DEMO MODE'}`)
+
+// Debug Firebase configuration (remove in production)
+if (isFirebaseConfigured) {
+  console.log('🔧 Firebase Config:', {
+    apiKey: firebaseConfig.apiKey ? '✅ Set' : '❌ Missing',
+    authDomain: firebaseConfig.authDomain,
+    projectId: firebaseConfig.projectId,
+    storageBucket: firebaseConfig.storageBucket
+  })
+}ou need from the SDKs you need
 import { initializeApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
@@ -20,20 +30,9 @@ const firebaseConfig = {
 const isFirebaseConfigured = firebaseConfig.apiKey && 
                              firebaseConfig.projectId && 
                              !firebaseConfig.apiKey.includes('demo') &&
-                             firebaseConfig.apiKey !== 'your-api-key' &&
-                             firebaseConfig.apiKey !== 'your-actual-firebase-api-key'
+                             firebaseConfig.apiKey !== 'your-api-key'
 
-console.log(`🔥 Firebase Configuration Status: ${isFirebaseConfigured ? 'PRODUCTION' : 'DEMO MODE'}`)
-
-// Debug Firebase configuration (remove in production)
-if (isFirebaseConfigured) {
-  console.log('🔧 Firebase Config:', {
-    apiKey: firebaseConfig.apiKey ? '✅ Set' : '❌ Missing',
-    authDomain: firebaseConfig.authDomain,
-    projectId: firebaseConfig.projectId,
-    storageBucket: firebaseConfig.storageBucket
-  })
-}
+console.log(`� Firebase Configuration Status: ${isFirebaseConfigured ? 'PRODUCTION' : 'DEMO MODE'}`)
 
 // Initialize Firebase
 let app = null
@@ -44,8 +43,6 @@ let analytics = null
 
 if (isFirebaseConfigured) {
   try {
-    console.log('🚀 Initializing Firebase with production config...')
-    
     // Initialize Firebase app
     app = initializeApp(firebaseConfig)
     
@@ -60,7 +57,6 @@ if (isFirebaseConfigured) {
     }
     
     console.log("✅ Firebase initialized successfully with production config")
-    console.log(`🔥 Project: ${firebaseConfig.projectId}`)
   } catch (error) {
     console.error("❌ Firebase initialization error:", error)
     console.warn("Please check your Firebase configuration")

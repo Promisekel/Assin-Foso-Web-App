@@ -7,7 +7,7 @@ import {
   updateProfile
 } from 'firebase/auth'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
-import { auth, db } from '../config/firebase'
+import { auth, db, isFirebaseConfigured } from '../config/firebase'
 import toast from 'react-hot-toast'
 
 const AuthContext = createContext()
@@ -26,13 +26,14 @@ export const AuthProvider = ({ children }) => {
   const [userProfile, setUserProfile] = useState(null)
 
   useEffect(() => {
-    // Check if Firebase is properly initialized
-    if (!auth) {
-      console.warn("Firebase Auth not initialized - running in demo mode")
+    // Check if Firebase is properly configured
+    if (!isFirebaseConfigured || !auth) {
+      console.warn("Firebase not configured - running in demo mode")
       setLoading(false)
       return
     }
 
+    console.log("🔥 Setting up Firebase Auth listener")
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setUser(user)
@@ -40,7 +41,13 @@ export const AuthProvider = ({ children }) => {
         try {
           const userDoc = await getDoc(doc(db, 'users', user.uid))
           if (userDoc.exists()) {
-            setUserProfile(userDoc.data())
+            const userData = userDoc.data()
+            setUserProfile(userData)
+            console.log('👤 User Profile Loaded:', {
+              name: userData.name,
+              role: userData.role,
+              permissions: userData.permissions
+            })
           }
         } catch (error) {
           console.error('Error fetching user profile:', error)
@@ -59,9 +66,9 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true)
       
-      // Demo mode login
-      if (!auth) {
-        // Check demo credentials
+      // Check if Firebase is configured for production
+      if (!isFirebaseConfigured || !auth) {
+        // Demo mode login
         if ((email === 'admin@assinfoso-kccr.org' && password === 'admin123') ||
             (email === 'member@assinfoso-kccr.org' && password === 'member123')) {
           
@@ -90,7 +97,8 @@ export const AuthProvider = ({ children }) => {
         }
       }
       
-      // Real Firebase login
+      // Production Firebase login
+      console.log("🔥 Attempting Firebase authentication...")
       const result = await signInWithEmailAndPassword(auth, email, password)
       toast.success('Successfully logged in!')
       return result
@@ -105,14 +113,14 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     try {
       // Demo mode logout
-      if (!auth) {
+      if (!isFirebaseConfigured || !auth) {
         setUser(null)
         setUserProfile(null)
         toast.success('Successfully logged out! (Demo Mode)')
         return
       }
       
-      // Real Firebase logout
+      // Production Firebase logout
       await signOut(auth)
       toast.success('Successfully logged out!')
     } catch (error) {
@@ -122,6 +130,10 @@ export const AuthProvider = ({ children }) => {
   }
 
   const createUser = async (email, password, userData) => {
+    if (!isFirebaseConfigured || !auth || !db) {
+      throw new Error('Firebase not configured for user creation. Please use demo credentials or set up Firebase.')
+    }
+
     try {
       setLoading(true)
       const result = await createUserWithEmailAndPassword(auth, email, password)
@@ -137,7 +149,10 @@ export const AuthProvider = ({ children }) => {
         email: email,
         createdAt: new Date(),
         lastLoginAt: new Date(),
-        role: userData.role || 'member'
+        role: userData.role || 'member',
+        permissions: userData.role === 'admin' ? 
+          ['read', 'write', 'admin', 'invite'] : 
+          ['read']
       })
 
       toast.success('User account created successfully!')
@@ -150,7 +165,28 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
+  const signup = async (email, password, profileData) => {
+    const userData = {
+      name: `${profileData.firstName} ${profileData.lastName}`,
+      firstName: profileData.firstName,
+      lastName: profileData.lastName,
+      phone: profileData.phone,
+      institution: profileData.institution,
+      department: profileData.department,
+      position: profileData.position,
+      location: profileData.location,
+      role: 'member' // Default role for new signups
+    }
+    
+    return await createUser(email, password, userData)
+  }
+
   const updateUserProfile = async (updates) => {
+    if (!isFirebaseConfigured || !auth || !db) {
+      toast.error('Profile updates not available in demo mode')
+      return
+    }
+
     try {
       if (user) {
         await setDoc(doc(db, 'users', user.uid), updates, { merge: true })
@@ -177,6 +213,7 @@ export const AuthProvider = ({ children }) => {
     loading,
     login,
     logout,
+    signup,
     createUser,
     updateUserProfile,
     isAdmin,

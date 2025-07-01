@@ -1,83 +1,97 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users can read/write their own user document
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to get user data
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    // Helper function to check user role
+    function hasRole(role) {
+      return isAuthenticated() && getUserData().role == role;
+    }
+    
+    // Helper function to check if user has permission
+    function hasPermission(permission) {
+      return isAuthenticated() && permission in getUserData().permissions;
+    }
+    
+    // Users collection - users can read/write their own data
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      allow read: if request.auth != null && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      allow read: if hasRole('admin'); // Admins can read all user profiles
     }
     
-    // Research publications - readable by authenticated users, writable by researchers and admins
+    // Research publications collection
     match /publications/{publicationId} {
-      allow read: if request.auth != null;
-      allow create, update: if request.auth != null && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'researcher'];
-      allow delete: if request.auth != null && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      allow read: if isAuthenticated();
+      allow create, update: if hasPermission('write') || hasRole('admin') || hasRole('researcher');
+      allow delete: if hasRole('admin');
     }
     
-    // Projects - readable by authenticated users, writable by team members
+    // Projects collection
     match /projects/{projectId} {
-      allow read: if request.auth != null;
-      allow create, update: if request.auth != null && 
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'researcher'] ||
-         request.auth.uid in resource.data.teamMembers);
-      allow delete: if request.auth != null && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      allow read: if isAuthenticated();
+      allow create, update: if hasPermission('write') || hasRole('admin') || hasRole('researcher');
+      allow delete: if hasRole('admin');
     }
     
-    // Gallery albums - readable by authenticated users, writable by admins
-    match /albums/{albumId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'researcher'];
+    // Gallery/Albums collection
+    match /gallery/{albumId} {
+      allow read: if isAuthenticated();
+      allow create, update: if hasPermission('write') || hasRole('admin');
+      allow delete: if hasRole('admin');
+      
+      // Photos within albums
+      match /photos/{photoId} {
+        allow read: if isAuthenticated();
+        allow create, update: if hasPermission('write') || hasRole('admin');
+        allow delete: if hasRole('admin');
+      }
     }
     
-    // Calendar events - readable by authenticated users, writable by researchers and admins
+    // Events collection
     match /events/{eventId} {
-      allow read: if request.auth != null;
-      allow create, update: if request.auth != null && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'researcher'];
-      allow delete: if request.auth != null && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      allow read: if isAuthenticated();
+      allow create, update: if hasPermission('write') || hasRole('admin');
+      allow delete: if hasRole('admin');
     }
     
-    // Chat messages - readable and writable by authenticated users
-    match /chats/{chatId}/messages/{messageId} {
-      allow read, create: if request.auth != null;
-      allow update, delete: if request.auth != null && 
-        request.auth.uid == resource.data.authorId;
+    // News/Updates collection
+    match /news/{newsId} {
+      allow read: if isAuthenticated();
+      allow create, update: if hasPermission('write') || hasRole('admin');
+      allow delete: if hasRole('admin');
     }
     
-    // Knowledge base articles - readable by authenticated users, writable by researchers and admins
-    match /knowledgeBase/{articleId} {
-      allow read: if request.auth != null;
-      allow create, update: if request.auth != null && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'researcher'];
-      allow delete: if request.auth != null && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    // Analytics and logs (admin only)
+    match /analytics/{document} {
+      allow read, write: if hasRole('admin');
     }
     
-    // Admin-only collections
-    match /admin/{document=**} {
-      allow read, write: if request.auth != null && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    // Settings collection (admin only)
+    match /settings/{document} {
+      allow read, write: if hasRole('admin');
     }
     
-    // Analytics data - admin only
-    match /analytics/{document=**} {
-      allow read, write: if request.auth != null && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    // Chat/Messages (if implemented)
+    match /messages/{messageId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && 
+        (request.auth.uid == resource.data.authorId || hasRole('admin'));
     }
     
-    // Meeting rooms - readable by authenticated users, writable by researchers and admins
-    match /meetingRooms/{roomId} {
-      allow read: if request.auth != null;
-      allow create, update: if request.auth != null && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'researcher'];
-      allow delete: if request.auth != null && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    // Notifications
+    match /notifications/{notificationId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow create: if hasRole('admin') || hasPermission('write');
     }
   }
 }
