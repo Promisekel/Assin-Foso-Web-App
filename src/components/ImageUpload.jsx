@@ -75,30 +75,31 @@ const ImageUpload = ({ albumId, albumName, onUploadComplete, onClose }) => {
         f.status === 'pending' ? { ...f, status: 'uploading' } : f
       ))
 
+      // Reset progress
+      setUploadProgress({})
+
       // Upload files using Firebase Storage Service
       console.log('🚀 Starting upload for', pendingFiles.length, 'files...')
+      console.log('📝 Files to upload:', pendingFiles.map(f => f.file.name))
       
       const uploadResults = await storageService.uploadMultipleImages(
         pendingFiles.map(f => f.file),
         albumId,
         (current, total, filename) => {
-          // Update progress for current file - immediate feedback
+          // Update progress for current file
           const currentFile = pendingFiles.find(f => f.file.name === filename)
           if (currentFile) {
-            const progress = Math.min(100, (current / total) * 100)
-            console.log(`📈 Progress for ${filename}: ${progress}%`)
+            const progress = Math.round((current / total) * 100)
+            console.log(`📈 Progress: ${current}/${total} (${progress}%) - ${filename}`)
             
-            setUploadProgress(prev => ({
-              ...prev,
-              [currentFile.id]: progress
-            }))
-            
-            // Mark file as success immediately when completed
-            if (progress >= 100) {
-              setFiles(prev => prev.map(f => 
-                f.id === currentFile.id ? { ...f, status: 'success' } : f
-              ))
-            }
+            setUploadProgress(prev => {
+              const newProgress = {
+                ...prev,
+                [currentFile.id]: progress
+              }
+              console.log('📊 Updated progress state:', newProgress)
+              return newProgress
+            })
           }
         }
       )
@@ -115,6 +116,14 @@ const ImageUpload = ({ albumId, albumName, onUploadComplete, onClose }) => {
             error: result.error 
           } : f
         ))
+        
+        // Set final progress to 100% for successful uploads
+        if (result.success) {
+          setUploadProgress(prev => ({
+            ...prev,
+            [fileItem.id]: 100
+          }))
+        }
       })
 
       // Create image records compatible with gallery
@@ -148,25 +157,27 @@ const ImageUpload = ({ albumId, albumName, onUploadComplete, onClose }) => {
       // Call upload complete callback
       if (onUploadComplete && typeof onUploadComplete === 'function') {
         try {
+          console.log('📤 Calling onUploadComplete with', uploadedImages.length, 'images')
           onUploadComplete(uploadedImages)
         } catch (error) {
           console.error('Error in onUploadComplete callback:', error)
         }
       }
 
-      // Show success message briefly before closing
+      // Show success state briefly then close
       setTimeout(() => {
         if (onClose && typeof onClose === 'function') {
           try {
+            console.log('🚪 Closing upload modal')
             onClose()
           } catch (error) {
             console.error('Error in onClose callback:', error)
           }
         }
-      }, 200) // Super fast close - just 200ms to show success
+      }, 500) // Give 500ms to see the success state
 
     } catch (error) {
-      console.error('Upload failed:', error)
+      console.error('❌ Upload failed:', error)
       // Mark failed uploads
       setFiles(prev => prev.map(f => 
         f.status === 'uploading' ? { ...f, status: 'error', error: error.message } : f

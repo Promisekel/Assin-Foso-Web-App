@@ -16,17 +16,27 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 }
 
-// Check if Firebase is properly configured
-const isFirebaseConfigured = firebaseConfig.apiKey && 
-                             firebaseConfig.projectId && 
-                             !firebaseConfig.apiKey.includes('demo') &&
-                             firebaseConfig.apiKey !== 'your-api-key' &&
-                             firebaseConfig.apiKey !== 'your-actual-firebase-api-key'
+// Check if Firebase is properly configured - FORCE PRODUCTION MODE
+const isFirebaseConfigured = true // Always use production Firebase
+// Verify we have the essential config values
+const hasEssentialConfig = firebaseConfig.apiKey && 
+                          firebaseConfig.projectId && 
+                          firebaseConfig.storageBucket &&
+                          firebaseConfig.authDomain
 
-console.log(`🔥 Firebase Configuration Status: ${isFirebaseConfigured ? 'PRODUCTION' : 'DEMO MODE'}`)
+if (!hasEssentialConfig) {
+  console.error('❌ Missing essential Firebase configuration. Please check your .env file.')
+  console.log('Required environment variables:')
+  console.log('- VITE_FIREBASE_API_KEY')
+  console.log('- VITE_FIREBASE_PROJECT_ID') 
+  console.log('- VITE_FIREBASE_STORAGE_BUCKET')
+  console.log('- VITE_FIREBASE_AUTH_DOMAIN')
+}
+
+console.log(`🔥 Firebase Configuration Status: ${hasEssentialConfig ? 'PRODUCTION' : 'MISSING CONFIG'}`)
 
 // Debug Firebase configuration (remove in production)
-if (isFirebaseConfigured) {
+if (hasEssentialConfig) {
   console.log('🔧 Firebase Config:', {
     apiKey: firebaseConfig.apiKey ? '✅ Set' : '❌ Missing',
     authDomain: firebaseConfig.authDomain,
