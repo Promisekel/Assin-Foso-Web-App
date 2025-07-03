@@ -29,11 +29,21 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Handle network errors
+    if (!error.response) {
+      // Network error - no response received
+      const networkError = new Error('Network error. Please check your connection and ensure the backend server is running.');
+      networkError.isNetworkError = true;
+      return Promise.reject(networkError);
+    }
+    
+    // Handle HTTP errors
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';
     }
+    
     return Promise.reject(error);
   }
 );
@@ -233,6 +243,28 @@ export const apiService = {
   // Convenience methods
   uploadImage: (formData) => imagesAPI.upload(formData),
   uploadDocument: (formData) => documentsAPI.upload(formData),
+  
+  // Network connectivity test
+  testConnection: async () => {
+    try {
+      const response = await api.get('/health');
+      return {
+        success: true,
+        status: response.data?.status || 'OK',
+        timestamp: response.data?.timestamp,
+        message: 'Backend connection successful'
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+        isNetworkError: !error.response,
+        message: error.isNetworkError ? 
+          'Cannot connect to backend server. Please ensure the server is running on port 5000.' :
+          `Backend error: ${error.response?.status || 'Unknown'}`
+      };
+    }
+  },
   
   // Storage utilities
   storage: storageUtils,

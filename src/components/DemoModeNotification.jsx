@@ -6,10 +6,12 @@ const DemoModeNotification = () => {
   const [isProduction, setIsProduction] = useState(false)
 
   useEffect(() => {
-    // Check if we're in demo mode or production
-    const isDemoMode = !import.meta.env.VITE_FIREBASE_API_KEY || 
-                       import.meta.env.VITE_FIREBASE_API_KEY?.includes('demo') ||
-                       import.meta.env.VITE_FIREBASE_API_KEY === 'your-actual-firebase-api-key'
+    // Check if we're in demo mode or production based on the new API
+    const apiUrl = import.meta.env.VITE_API_BASE_URL
+    const isDemoMode = !apiUrl || 
+                       apiUrl.includes('localhost') ||
+                       apiUrl.includes('127.0.0.1') ||
+                       import.meta.env.VITE_APP_ENV === 'development'
     
     setIsProduction(!isDemoMode)
     setShow(true)
@@ -48,9 +50,9 @@ const DemoModeNotification = () => {
               isProduction ? 'text-green-700' : 'text-blue-700'
             }`}>
               {isProduction ? (
-                'Firebase authentication is configured. Use real user accounts to log in.'
+                'Backend API is configured for production. All features are fully functional.'
               ) : (
-                'Firebase authentication is disabled. Use demo credentials: admin@assinfoso-kccr.org/admin123'
+                'Development mode: Backend running locally. Use demo credentials: admin@assinfoso.edu.gh/admin123'
               )}
             </p>
           </div>
