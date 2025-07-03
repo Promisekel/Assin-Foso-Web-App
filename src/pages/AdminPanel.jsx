@@ -3,9 +3,9 @@ import { Users, Mail, Settings, Shield } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 
 const AdminPanel = () => {
-  const { isAdmin } = useAuth()
+  const { user } = useAuth()
 
-  if (!isAdmin()) {
+  if (!user || user.role !== 'ADMIN') {
     return (
       <div className="text-center py-12">
         <Shield className="h-12 w-12 text-gray-400 mx-auto mb-4" />

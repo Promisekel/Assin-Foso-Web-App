@@ -20,7 +20,7 @@ const SignUpPage = () => {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
-  const { signup } = useAuth()
+  const { register } = useAuth()
 
   const handleChange = (e) => {
     setFormData({
@@ -50,18 +50,22 @@ const SignUpPage = () => {
 
     setLoading(true)
     try {
-      await signup(formData.email, formData.password, {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
+      const result = await register({
+        name: `${formData.firstName} ${formData.lastName}`,
+        email: formData.email,
+        password: formData.password,
         phone: formData.phone,
-        institution: formData.institution,
+        bio: `${formData.position} at ${formData.institution}`,
         department: formData.department,
-        position: formData.position,
+        institution: formData.institution,
         location: formData.location
       })
-      toast.success('Account created successfully! Welcome to the platform.')
+      
+      if (result.success) {
+        toast.success('Account created successfully! Please log in.')
+      }
     } catch (error) {
-      console.error('Signup error:', error)
+      console.error('Registration error:', error)
     } finally {
       setLoading(false)
     }

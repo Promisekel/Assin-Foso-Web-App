@@ -18,7 +18,9 @@ const ProjectTracker = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [loading, setLoading] = useState(false)
-  const { isAdmin } = useAuth()
+  const { user } = useAuth()
+
+  const isAdmin = user && user.role === 'ADMIN'
 
   // Mock data - replace with Google Sheets API integration
   const mockProjects = [

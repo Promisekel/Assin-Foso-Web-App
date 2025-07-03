@@ -14,7 +14,7 @@ import ParticleBackground from './components/ParticleBackground'
 
 // Page Components
 import HomePage from './pages/HomePage'
-import LoginPage from './pages/LoginPage'
+import LoginPage from './pages/NewLoginPage'
 import SignUpPage from './pages/SignUpPage'
 import Gallery from './pages/Gallery'
 import ProjectTracker from './pages/ProjectTracker'
@@ -33,7 +33,7 @@ import ContentManager from './pages/ContentManager'
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
-  const { user, loading } = useAuth()
+  const { isAuthenticated, loading } = useAuth()
   
   if (loading) {
     return (
@@ -43,7 +43,7 @@ const ProtectedRoute = ({ children }) => {
     )
   }
   
-  if (!user) {
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />
   }
   

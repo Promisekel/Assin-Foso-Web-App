@@ -344,25 +344,48 @@ const Gallery = () => {
   
   // Safe auth access
   const auth = useAuth()
-  const { isAdmin } = auth || {}
+  const { isAdmin, isAdminUser: contextIsAdmin } = auth || {}
   
   // Safe gallery context access
   const galleryContext = useGallery()
   const { albums = [], setAlbums, addImagesToAlbum, getAlbumImages, deleteImage } = galleryContext || {}
 
-  // Safety check for isAdmin function - ensure it returns a boolean
+  // Robust admin check that handles both the context value and function
   const isAdminUser = React.useMemo(() => {
     try {
+      // First check the precomputed context value
+      if (contextIsAdmin !== undefined) {
+        const result = Boolean(contextIsAdmin)
+        console.log('🔑 Using context admin status:', result)
+        return result
+      }
+      
+      // Fallback to the function
       if (typeof isAdmin === 'function') {
         const result = isAdmin()
-        return Boolean(result)
+        const boolResult = Boolean(result)
+        console.log('🔑 Computed admin status:', boolResult)
+        return boolResult
       }
+      
+      // Default to false if nothing available
+      console.log('🔑 No admin check available, defaulting to false')
       return false
     } catch (error) {
-      console.error('Error checking admin status:', error)
+      console.error('❌ Error checking admin status:', error)
       return false
     }
-  }, [isAdmin])
+  }, [isAdmin, contextIsAdmin])
+
+  // Debug logging for admin status
+  React.useEffect(() => {
+    console.log('👤 Gallery Admin Status:', {
+      isAdminUser,
+      authAvailable: !!auth,
+      isAdminFunction: typeof isAdmin === 'function',
+      contextIsAdmin: contextIsAdmin
+    })
+  }, [isAdminUser, auth, isAdmin, contextIsAdmin])
 
   // Memoized filtered images - must be defined before handlers that use it
   const filteredImages = useMemo(() => {
@@ -428,9 +451,34 @@ const Gallery = () => {
 
   // Upload handlers
   const handleUploadClick = useCallback((album = null) => {
-    setUploadingToAlbum(album || selectedAlbum)
+    // Enhanced upload click handler with validation and logging
+    console.log('📤 Upload button clicked', { album, selectedAlbum, isAdminUser })
+    
+    // Double-check admin status before allowing upload
+    if (!isAdminUser) {
+      console.warn('⚠️ Upload blocked: User is not admin')
+      // Could show a toast notification here
+      if (window.toast && typeof window.toast.error === 'function') {
+        window.toast.error('Upload is only available for administrators')
+      }
+      return
+    }
+    
+    // Determine which album to upload to
+    const targetAlbum = album || selectedAlbum
+    
+    if (!targetAlbum) {
+      console.warn('⚠️ Upload blocked: No album selected')
+      if (window.toast && typeof window.toast.error === 'function') {
+        window.toast.error('Please select an album first')
+      }
+      return
+    }
+    
+    console.log('✅ Opening upload modal for album:', targetAlbum.title)
+    setUploadingToAlbum(targetAlbum)
     setShowImageUpload(true)
-  }, [selectedAlbum])
+  }, [selectedAlbum, isAdminUser])
 
   const handleUploadComplete = useCallback((uploadedImages) => {
     try {

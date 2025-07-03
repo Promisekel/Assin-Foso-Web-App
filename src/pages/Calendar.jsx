@@ -9,7 +9,9 @@ import { useAuth } from '../contexts/AuthContext'
 const Calendar = () => {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(false)
-  const { isAdmin } = useAuth()
+  const { user } = useAuth()
+  
+  const isAdmin = user && user.role === 'ADMIN'
 
   // Mock events - replace with Google Calendar API integration
   const mockEvents = [

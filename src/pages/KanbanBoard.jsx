@@ -206,7 +206,9 @@ const KanbanBoard = () => {
   const [tasks, setTasks] = useState([])
   const [activeId, setActiveId] = useState(null)
   const [loading, setLoading] = useState(false)
-  const { isAdmin } = useAuth()
+  const { user } = useAuth()
+  
+  const isAdmin = user && user.role === 'ADMIN'
 
   const sensors = useSensors(
     useSensor(PointerSensor, {

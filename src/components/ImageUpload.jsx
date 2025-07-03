@@ -1,6 +1,8 @@
 import React, { useState, useCallback, useRef } from 'react'
 import { Upload, X, Image as ImageIcon, AlertCircle, Check, Loader } from 'lucide-react'
-import { storageService } from '../services/FirebaseStorageService'
+import { apiService } from '../services/api'
+import { useAuth } from '../contexts/AuthContext'
+import toast from 'react-hot-toast'
 
 const ImageUpload = ({ albumId, albumName, onUploadComplete, onClose }) => {
   const [files, setFiles] = useState([])
@@ -8,6 +10,7 @@ const ImageUpload = ({ albumId, albumName, onUploadComplete, onClose }) => {
   const [uploadProgress, setUploadProgress] = useState({})
   const [dragOver, setDragOver] = useState(false)
   const fileInputRef = useRef(null)
+  const { user } = useAuth()
 
   // Handle file selection
   const handleFileSelect = useCallback((selectedFiles) => {
@@ -51,7 +54,7 @@ const ImageUpload = ({ albumId, albumName, onUploadComplete, onClose }) => {
   const removeFile = useCallback((fileId) => {
     setFiles(prev => {
       const updated = prev.filter(f => f.id !== fileId)
-      // Clean up preview URL
+      // Clean up object URL
       const fileToRemove = prev.find(f => f.id === fileId)
       if (fileToRemove && fileToRemove.preview) {
         URL.revokeObjectURL(fileToRemove.preview)
@@ -60,7 +63,7 @@ const ImageUpload = ({ albumId, albumName, onUploadComplete, onClose }) => {
     })
   }, [])
 
-  // Upload all files using Firebase Storage
+  // Upload all files using new API
   const handleUpload = async () => {
     if (files.length === 0) {
       return
@@ -68,167 +71,134 @@ const ImageUpload = ({ albumId, albumName, onUploadComplete, onClose }) => {
 
     setUploading(true)
     const pendingFiles = files.filter(f => f.status === 'pending')
+    console.log(`🚀 Starting upload process for ${pendingFiles.length} files to album: ${albumId}`)
 
     try {
-      // Update files status to uploading
+      // Validate albumId before proceeding
+      if (!albumId) {
+        throw new Error('Album ID is required for uploading')
+      }
+
+      // Check if user is admin
+      if (!user || user.role !== 'ADMIN') {
+        throw new Error('Only administrators can upload images')
+      }
+
+      // Update all pending files to uploading status
       setFiles(prev => prev.map(f => 
         f.status === 'pending' ? { ...f, status: 'uploading' } : f
       ))
 
-      // Reset progress
+      // Reset all progress indicators
       setUploadProgress({})
-
-      // Upload files using Firebase Storage Service
-      console.log('🚀 Starting upload for', pendingFiles.length, 'files...')
-      console.log('📝 Files to upload:', pendingFiles.map(f => f.file.name))
       
-      const uploadResults = await storageService.uploadMultipleImages(
-        pendingFiles.map(f => f.file),
-        albumId,
-        (current, total, filename) => {
-          // Update progress for current file
-          const currentFile = pendingFiles.find(f => f.file.name === filename)
-          if (currentFile) {
-            const progress = Math.round((current / total) * 100)
-            console.log(`📈 Progress: ${current}/${total} (${progress}%) - ${filename}`)
-            
-            setUploadProgress(prev => {
-              const newProgress = {
-                ...prev,
-                [currentFile.id]: progress
-              }
-              console.log('📊 Updated progress state:', newProgress)
-              return newProgress
-            })
-          }
-        }
-      )
-
-      console.log('✅ Upload results:', uploadResults)
-
-      // Update file statuses based on results
-      uploadResults.forEach((result, index) => {
-        const fileItem = pendingFiles[index]
-        setFiles(prev => prev.map(f => 
-          f.id === fileItem.id ? { 
-            ...f, 
-            status: result.success ? 'success' : 'error',
-            error: result.error 
-          } : f
-        ))
+      // Upload files one by one to the new API
+      const uploadResults = []
+      
+      for (let i = 0; i < pendingFiles.length; i++) {
+        const fileItem = pendingFiles[i]
         
-        // Set final progress to 100% for successful uploads
-        if (result.success) {
+        try {
+          // Create FormData for file upload
+          const formData = new FormData()
+          formData.append('image', fileItem.file)
+          formData.append('albumId', albumId)
+          formData.append('title', fileItem.name.split('.')[0])
+          formData.append('description', `Uploaded to ${albumName} album`)
+          
+          // Update progress to show uploading
+          setUploadProgress(prev => ({
+            ...prev,
+            [fileItem.id]: 50
+          }))
+          
+          // Upload via new API
+          const result = await apiService.uploadImage(formData)
+          
+          // Update progress to complete
           setUploadProgress(prev => ({
             ...prev,
             [fileItem.id]: 100
           }))
-        }
-      })
-
-      // Create image records compatible with gallery
-      const uploadedImages = uploadResults
-        .filter(result => result.success)
-        .map((result, index) => {
-          const now = new Date()
-          const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, -5)
           
-          return {
-            id: Date.now() + index + Math.random(),
-            albumId: albumId,
-            title: `IMG_${timestamp}`, // Use current date/time as title
-            description: `Uploaded to ${albumName} album on ${now.toLocaleDateString()}`,
-            url: result.url,
-            thumbnail: result.url,
-            storagePath: result.path, // Store Firebase path for deletion
-            fileName: result.fileName,
-            tags: ['uploaded', albumName.toLowerCase().replace(/\s+/g, '-'), 'new'],
-            uploadedBy: 'Current User',
-            uploadedAt: now.toISOString(),
-            createdAt: now.toISOString(),
-            views: 0,
-            likes: 0,
-            size: result.size,
-            type: result.type,
-            isFirebase: !result.isDemo // Track if it's stored in Firebase
-          }
-        })
-
-      // Call upload complete callback
-      if (onUploadComplete && typeof onUploadComplete === 'function') {
-        try {
-          console.log('📤 Calling onUploadComplete with', uploadedImages.length, 'images')
-          onUploadComplete(uploadedImages)
-        } catch (error) {
-          console.error('Error in onUploadComplete callback:', error)
+          // Mark file as successful
+          setFiles(prev => prev.map(f => 
+            f.id === fileItem.id ? { ...f, status: 'success' } : f
+          ))
+          
+          uploadResults.push({
+            success: true,
+            data: result,
+            fileName: fileItem.name
+          })
+          
+        } catch (uploadError) {
+          console.error(`Upload failed for ${fileItem.name}:`, uploadError)
+          
+          // Mark file as failed
+          setFiles(prev => prev.map(f => 
+            f.id === fileItem.id ? { 
+              ...f, 
+              status: 'error',
+              error: uploadError.message || 'Upload failed'
+            } : f
+          ))
+          
+          uploadResults.push({
+            success: false,
+            error: uploadError.message || 'Upload failed',
+            fileName: fileItem.name
+          })
         }
       }
 
-      // Show success state briefly then close
-      setTimeout(() => {
-        if (onClose && typeof onClose === 'function') {
+      console.log('✅ Upload results:', uploadResults)
+
+      // Count the successful uploads
+      const successfulUploads = uploadResults.filter(result => result.success)
+      console.log(`📊 Upload summary: ${successfulUploads.length} of ${uploadResults.length} successful`)
+      
+      if (successfulUploads.length > 0) {
+        // Show success toast
+        toast.success(`Successfully uploaded ${successfulUploads.length} image(s)`)
+        
+        // Call upload complete callback
+        if (onUploadComplete && typeof onUploadComplete === 'function') {
           try {
-            console.log('🚪 Closing upload modal')
-            onClose()
+            console.log('📤 Notifying gallery of new uploads')
+            onUploadComplete(successfulUploads.map(result => result.data))
+            console.log('✅ Images successfully added to gallery')
           } catch (error) {
-            console.error('Error in onClose callback:', error)
+            console.error('❌ Error in onUploadComplete callback:', error)
           }
         }
-      }, 500) // Give 500ms to see the success state
+        
+        // Close the modal after a short delay
+        setTimeout(() => {
+          if (onClose && typeof onClose === 'function') {
+            onClose()
+          }
+        }, 1000)
+      } else {
+        toast.error('No files were uploaded successfully')
+      }
 
     } catch (error) {
-      console.error('❌ Upload failed:', error)
-      // Mark failed uploads
+      console.error('❌ Upload process failed:', error)
+      toast.error(error.message || 'Upload failed')
+      
+      // Mark all uploading files as failed
       setFiles(prev => prev.map(f => 
-        f.status === 'uploading' ? { ...f, status: 'error', error: error.message } : f
+        f.status === 'uploading' ? { 
+          ...f, 
+          status: 'error', 
+          error: error.message || 'Upload failed'
+        } : f
       ))
     } finally {
       setUploading(false)
     }
   }
-
-  // Quick upload option - skip the delay and close immediately on success
-  const handleQuickUpload = useCallback(() => {
-    if (onUploadComplete && typeof onUploadComplete === 'function') {
-      // Get successful uploads
-      const successfulFiles = files.filter(f => f.status === 'success')
-      if (successfulFiles.length > 0) {
-        try {
-          // Create quick image records for successful uploads
-          const quickImages = successfulFiles.map((fileItem, index) => {
-            const now = new Date()
-            const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, -5)
-            
-            return {
-              id: Date.now() + index + Math.random(),
-              albumId: albumId,
-              title: `IMG_${timestamp}`,
-              description: `Uploaded to ${albumName} album`,
-              url: fileItem.preview,
-              thumbnail: fileItem.preview,
-              tags: ['uploaded', 'quick'],
-              uploadedBy: 'Current User',
-              uploadedAt: now.toISOString(),
-              createdAt: now.toISOString(),
-              views: 0,
-              likes: 0,
-              size: fileItem.size,
-              type: fileItem.file.type,
-              isDemo: true
-            }
-          })
-          
-          onUploadComplete(quickImages)
-        } catch (error) {
-          console.error('Error in quick upload:', error)
-        }
-      }
-    }
-    
-    if (onClose && typeof onClose === 'function') {
-      onClose()
-    }
-  }, [files, albumId, albumName, onUploadComplete, onClose])
 
   // Format file size
   const formatFileSize = (bytes) => {
@@ -240,62 +210,56 @@ const ImageUpload = ({ albumId, albumName, onUploadComplete, onClose }) => {
   }
 
   // Get status icon
-  const getStatusIcon = (status, fileId) => {
+  const getStatusIcon = (status) => {
     switch (status) {
       case 'uploading':
-        return <Loader className="h-4 w-4 animate-spin text-blue-500" />
+        return <Loader className="w-4 h-4 animate-spin text-blue-500" />
       case 'success':
-        return <Check className="h-4 w-4 text-green-500" />
+        return <Check className="w-4 h-4 text-green-500" />
       case 'error':
-        return <AlertCircle className="h-4 w-4 text-red-500" />
+        return <AlertCircle className="w-4 h-4 text-red-500" />
       default:
-        return null
+        return <ImageIcon className="w-4 h-4 text-gray-400" />
     }
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+        <div className="flex items-center justify-between p-6 border-b">
           <div>
             <h2 className="text-xl font-bold text-gray-900">Upload Images</h2>
-            <p className="text-sm text-gray-600 mt-1">Upload images to "{albumName}" album</p>
+            <p className="text-sm text-gray-600">Album: {albumName}</p>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
           >
-            <X className="h-6 w-6" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Upload Area */}
         <div className="p-6">
           <div
-            className={`border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200 ${
+            className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors ${
               dragOver
-                ? 'border-primary-500 bg-primary-50'
-                : 'border-gray-300 hover:border-primary-400 hover:bg-gray-50'
+                ? 'border-blue-500 bg-blue-50'
+                : 'border-gray-300 hover:border-gray-400'
             }`}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
           >
-            <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              Drop images here or click to browse
-            </h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Support: JPG, PNG, GIF up to 10MB each
+            <Upload className={`w-12 h-12 mx-auto mb-4 ${dragOver ? 'text-blue-500' : 'text-gray-400'}`} />
+            <p className="text-lg font-medium text-gray-900 mb-2">
+              {dragOver ? 'Drop files here' : 'Choose files or drag and drop'}
             </p>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="btn-primary inline-flex items-center"
-            >
-              <ImageIcon className="h-4 w-4 mr-2" />
-              Select Images
-            </button>
+            <p className="text-sm text-gray-600">
+              PNG, JPG, GIF up to 10MB each
+            </p>
             <input
               ref={fileInputRef}
               type="file"
@@ -305,67 +269,48 @@ const ImageUpload = ({ albumId, albumName, onUploadComplete, onClose }) => {
               className="hidden"
             />
           </div>
-        </div>
 
-        {/* File List */}
-        {files.length > 0 && (
-          <div className="border-t border-gray-200">
-            <div className="p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Selected Images ({files.length})
+          {/* File List */}
+          {files.length > 0 && (
+            <div className="mt-6">
+              <h3 className="text-sm font-medium text-gray-900 mb-3">
+                Selected Files ({files.length})
               </h3>
-              <div className="max-h-60 overflow-y-auto space-y-3">
-                {files.map((fileItem) => (
+              <div className="space-y-3 max-h-48 overflow-y-auto">
+                {files.map((file) => (
                   <div
-                    key={fileItem.id}
-                    className="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg"
+                    key={file.id}
+                    className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg"
                   >
-                    {/* Preview */}
-                    <div className="flex-shrink-0">
-                      <img
-                        src={fileItem.preview}
-                        alt={fileItem.name}
-                        className="h-12 w-12 object-cover rounded-lg"
-                      />
-                    </div>
-
-                    {/* File Info */}
+                    <img
+                      src={file.preview}
+                      alt=""
+                      className="w-12 h-12 object-cover rounded-lg"
+                    />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">
-                        {fileItem.name}
+                        {file.name}
                       </p>
-                      <p className="text-xs text-gray-600">
-                        {formatFileSize(fileItem.size)}
+                      <p className="text-xs text-gray-500">
+                        {formatFileSize(file.size)}
                       </p>
+                      {file.status === 'error' && file.error && (
+                        <p className="text-xs text-red-500">{file.error}</p>
+                      )}
                     </div>
-
-                    {/* Progress */}
-                    {fileItem.status === 'uploading' && (
-                      <div className="flex-shrink-0 w-24">
-                        <div className="bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                            style={{
-                              width: `${uploadProgress[fileItem.id] || 0}%`
-                            }}
-                          />
-                        </div>
-                        <p className="text-xs text-gray-600 mt-1 text-center">
-                          {Math.round(uploadProgress[fileItem.id] || 0)}%
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Status */}
-                    <div className="flex-shrink-0 flex items-center space-x-2">
-                      {getStatusIcon(fileItem.status, fileItem.id)}
-                      {fileItem.status === 'pending' && (
+                    <div className="flex items-center space-x-2">
+                      {getStatusIcon(file.status)}
+                      {uploadProgress[file.id] && (
+                        <span className="text-xs text-gray-500">
+                          {uploadProgress[file.id]}%
+                        </span>
+                      )}
+                      {file.status === 'pending' && (
                         <button
-                          onClick={() => removeFile(fileItem.id)}
-                          className="text-gray-400 hover:text-red-500 transition-colors"
-                          disabled={uploading}
+                          onClick={() => removeFile(file.id)}
+                          className="p-1 hover:bg-gray-200 rounded"
                         >
-                          <X className="h-4 w-4" />
+                          <X className="w-4 h-4 text-gray-400" />
                         </button>
                       )}
                     </div>
@@ -373,62 +318,31 @@ const ImageUpload = ({ albumId, albumName, onUploadComplete, onClose }) => {
                 ))}
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-6 bg-gray-50 border-t border-gray-200">
+        <div className="flex items-center justify-between p-6 border-t bg-gray-50">
           <div className="text-sm text-gray-600">
-            {files.filter(f => f.status === 'success').length > 0 && (
-              <span className="text-green-600 font-medium">
-                ✓ {files.filter(f => f.status === 'success').length} of {files.length} uploaded successfully
-              </span>
-            )}
-            {files.filter(f => f.status === 'error').length > 0 && (
-              <span className="text-red-600 font-medium">
-                ✗ {files.filter(f => f.status === 'error').length} failed to upload
-              </span>
-            )}
-            {!uploading && files.length > 0 && files.every(f => f.status !== 'pending') && (
-              <span className="text-gray-600">Upload complete!</span>
-            )}
+            {files.filter(f => f.status === 'success').length} of {files.length} uploaded
           </div>
           <div className="flex space-x-3">
             <button
               onClick={onClose}
-              className="btn-secondary"
+              className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               disabled={uploading}
             >
               Cancel
             </button>
-            
-            {/* Quick Upload Button - for immediate results */}
-            {files.some(f => f.status === 'success') && (
-              <button
-                onClick={handleQuickUpload}
-                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center"
-              >
-                <Check className="h-4 w-4 mr-2" />
-                Use Uploaded ({files.filter(f => f.status === 'success').length})
-              </button>
-            )}
-            
             <button
               onClick={handleUpload}
-              disabled={files.length === 0 || uploading || files.every(f => f.status !== 'pending')}
-              className="btn-primary relative"
+              disabled={uploading || files.filter(f => f.status === 'pending').length === 0}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
             >
-              {uploading ? (
-                <>
-                  <Loader className="h-4 w-4 mr-2 animate-spin" />
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload {files.filter(f => f.status === 'pending').length} Images
-                </>
-              )}
+              {uploading && <Loader className="w-4 h-4 animate-spin" />}
+              <span>
+                {uploading ? 'Uploading...' : `Upload ${files.filter(f => f.status === 'pending').length} Files`}
+              </span>
             </button>
           </div>
         </div>
