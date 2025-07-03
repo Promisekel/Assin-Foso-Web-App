@@ -1,10 +1,9 @@
-[build-system]
-engine = "vite"
-command = "npm run build"
+[build]
 publish = "dist"
+command = "npm run build"
 
 [build.environment]
-  NODE_VERSION = "18"
+NODE_VERSION = "18"
 
 [[redirects]]
   from = "/*"

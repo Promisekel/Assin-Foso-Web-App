@@ -214,3 +214,26 @@ export const storageUtils = {
 };
 
 export default api;
+
+// Combined API service for easy import
+export const apiService = {
+  // Auth
+  ...authAPI,
+  
+  // Core APIs
+  users: usersAPI,
+  projects: projectsAPI,
+  tasks: tasksAPI,
+  albums: albumsAPI,
+  images: imagesAPI,
+  documents: documentsAPI,
+  calendar: calendarAPI,
+  invites: invitesAPI,
+  
+  // Convenience methods
+  uploadImage: (formData) => imagesAPI.upload(formData),
+  uploadDocument: (formData) => documentsAPI.upload(formData),
+  
+  // Storage utilities
+  storage: storageUtils,
+};
