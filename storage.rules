@@ -1,0 +1,90 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check file size (max 10MB)
+    function isValidSize() {
+      return request.resource.size < 10 * 1024 * 1024;
+    }
+    
+    // Helper function to check if file is an image
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+    
+    // Helper function to check if file is a document
+    function isDocument() {
+      return request.resource.contentType.matches('application/pdf') ||
+             request.resource.contentType.matches('application/msword') ||
+             request.resource.contentType.matches('application/vnd.openxmlformats-officedocument.*') ||
+             request.resource.contentType.matches('text/.*');
+    }
+    
+    // Profile pictures - users can upload their own profile picture
+    match /profiles/{userId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && 
+                   request.auth.uid == userId && 
+                   isImage() && 
+                   isValidSize();
+    }
+    
+    // Gallery images - members with write permission can upload
+    match /gallery/{albumId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && 
+                   isImage() && 
+                   isValidSize();
+    }
+    
+    // Research publication files - researchers and admins can upload
+    match /publications/{publicationId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && 
+                   (isDocument() || isImage()) && 
+                   isValidSize();
+    }
+    
+    // Project documents - team members can upload project-related files
+    match /projects/{projectId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && 
+                   (isDocument() || isImage()) && 
+                   isValidSize();
+    }
+    
+    // Knowledge base attachments
+    match /knowledgeBase/{articleId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && 
+                   (isDocument() || isImage()) && 
+                   isValidSize();
+    }
+    
+    // Team photos and documents
+    match /team/{memberId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && 
+                   (isDocument() || isImage()) && 
+                   isValidSize();
+    }
+    
+    // Temporary uploads - for processing before moving to permanent location
+    match /temp/{userId}/{fileName} {
+      allow read, write: if isAuthenticated() && 
+                         request.auth.uid == userId && 
+                         isValidSize();
+    }
+    
+    // Public assets - readable by all authenticated users
+    match /public/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Only allow writes through admin functions
+    }
+  }
+}

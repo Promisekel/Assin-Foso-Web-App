@@ -50,9 +50,11 @@ const LoginPage = () => {
       const result = await login(formData.email, formData.password);
       
       if (result.success) {
-        // Redirect to intended page or dashboard
-        const from = location.state?.from?.pathname || '/';
-        navigate(from, { replace: true });
+        // Small delay to ensure state is updated
+        setTimeout(() => {
+          const from = location.state?.from?.pathname || '/';
+          navigate(from, { replace: true });
+        }, 100);
       }
     } catch (error) {
       console.error('Login error:', error);
@@ -199,13 +201,14 @@ const LoginPage = () => {
             </button>
           </div>
 
-          {/* Demo Credentials */}
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <h3 className="text-sm font-medium text-gray-700 mb-2">Demo Credentials:</h3>
-            <div className="space-y-1 text-xs text-gray-600">
-              <p><strong>Admin:</strong> admin@assinfoso.edu.gh / admin123456</p>
-              <p><strong>User:</strong> researcher@assinfoso.edu.gh / user123456</p>
+          {/* Production Credentials */}
+          <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <h3 className="text-sm font-medium text-blue-700 mb-2">Access Credentials:</h3>
+            <div className="space-y-1 text-xs text-blue-600">
+              <p><strong>Administrator:</strong> admin@assinfoso-kccr.edu.gh</p>
+              <p><strong>Researcher:</strong> researcher@assinfoso-kccr.edu.gh</p>
             </div>
+            <p className="text-xs text-blue-500 mt-2">Contact your system administrator for login credentials.</p>
           </div>
 
           {/* Sign up link */}

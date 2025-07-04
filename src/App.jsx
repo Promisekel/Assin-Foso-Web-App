@@ -92,7 +92,7 @@ const MainContent = ({ children }) => {
 }
 
 function App() {
-  const { user } = useAuth()
+  const { isAuthenticated } = useAuth()
 
   return (
     <NavigationProvider>
@@ -103,11 +103,11 @@ function App() {
         {/* Public Routes */}
         <Route 
           path="/login" 
-          element={!user ? <LoginPage /> : <Navigate to="/" replace />} 
+          element={!isAuthenticated ? <LoginPage /> : <Navigate to="/" replace />} 
         />
         <Route 
           path="/signup" 
-          element={!user ? <SignUpPage /> : <Navigate to="/" replace />} 
+          element={!isAuthenticated ? <SignUpPage /> : <Navigate to="/" replace />} 
         />
         
         {/* Protected Routes */}

@@ -1,129 +1,110 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-// User management and authentication
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  name         String
-  password     String   // Store hashed password
-  role         String   @default("user") // "admin" or "user"
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now()) @map("created_at")
-  lastLoginAt  DateTime? @map("last_login_at")
-
-  // Relations
-  uploadedImages     Image[]    @relation("ImagesUploaded")
-  uploadedDocuments  Document[] @relation("DocumentsUploaded")
-  createdProjects    Project[]  @relation("ProjectCreator")
-  createdAlbums      Album[]    @relation("AlbumsCreated")
-  tasks              Task[]     @relation("TaskAssignee")
-  createdTasks       Task[]     @relation("TaskCreator")
-  sentInvites        Invite[]   @relation("InviteSender")
-  acceptedInvites    Invite[]   @relation("InviteAcceptor")
-  createdEvents      CalendarEvent[] @relation("EventCreator")
-  eventAttendees     EventAttendee[]
-  projectMembers     ProjectMember[]
+  id                String          @id @default(cuid())
+  email             String          @unique
+  name              String
+  password          String
+  role              String          @default("user")
+  isActive          Boolean         @default(true)
+  createdAt         DateTime        @default(now()) @map("created_at")
+  lastLoginAt       DateTime?       @map("last_login_at")
+  createdAlbums     Album[]         @relation("AlbumsCreated")
+  createdEvents     CalendarEvent[] @relation("EventCreator")
+  uploadedDocuments Document[]      @relation("DocumentsUploaded")
+  eventAttendees    EventAttendee[]
+  uploadedImages    Image[]         @relation("ImagesUploaded")
+  acceptedInvites   Invite[]        @relation("InviteAcceptor")
+  sentInvites       Invite[]        @relation("InviteSender")
+  projectMembers    ProjectMember[]
+  createdProjects   Project[]       @relation("ProjectCreator")
+  createdTasks      Task[]          @relation("TaskCreator")
+  tasks             Task[]          @relation("TaskAssignee")
 
   @@map("users")
 }
 
-// Invitation system
 model Invite {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   email        String
   name         String
-  role         String   @default("user")
-  token        String   @unique
-  status       String   @default("pending") // "pending", "accepted", "expired", "cancelled"
-  expiresAt    DateTime @map("expires_at")
-  createdAt    DateTime @default(now()) @map("created_at")
+  role         String    @default("user")
+  token        String    @unique
+  status       String    @default("pending")
+  expiresAt    DateTime  @map("expires_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
   acceptedAt   DateTime? @map("accepted_at")
-  invitedById  String   @map("invited_by_id")
-  acceptedById String?  @map("accepted_by_id")
-
-  // Relations
-  invitedBy   User  @relation("InviteSender", fields: [invitedById], references: [id])
-  acceptedBy  User? @relation("InviteAcceptor", fields: [acceptedById], references: [id])
+  invitedById  String    @map("invited_by_id")
+  acceptedById String?   @map("accepted_by_id")
+  acceptedBy   User?     @relation("InviteAcceptor", fields: [acceptedById], references: [id])
+  invitedBy    User      @relation("InviteSender", fields: [invitedById], references: [id])
 
   @@map("invites")
 }
 
-// Project management
 model Project {
-  id           String   @id @default(cuid())
-  name         String
-  description  String?
-  status       String   @default("planning") // "planning", "active", "on_hold", "completed", "cancelled"
-  priority     String   @default("medium") // "low", "medium", "high", "urgent"
-  startDate    DateTime? @map("start_date")
-  dueDate      DateTime? @map("due_date")
-  budget       Float?
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-  createdById  String   @map("created_by_id")
-
-  // Relations
-  createdBy      User              @relation("ProjectCreator", fields: [createdById], references: [id])
-  tasks          Task[]
-  documents      Document[]
+  id             String          @id @default(cuid())
+  name           String
+  description    String?
+  status         String          @default("planning")
+  priority       String          @default("medium")
+  startDate      DateTime?       @map("start_date")
+  dueDate        DateTime?       @map("due_date")
+  budget         Float?
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  createdById    String          @map("created_by_id")
   calendarEvents CalendarEvent[]
+  documents      Document[]
   teamMembers    ProjectMember[]
+  createdBy      User            @relation("ProjectCreator", fields: [createdById], references: [id])
+  tasks          Task[]
 
   @@map("projects")
 }
 
-// Project team members (many-to-many)
 model ProjectMember {
-  id        String @id @default(cuid())
-  projectId String @map("project_id")
-  userId    String @map("user_id")
-  role      String @default("member") // "lead", "member"
+  id        String   @id @default(cuid())
+  projectId String   @map("project_id")
+  userId    String   @map("user_id")
+  role      String   @default("member")
   joinedAt  DateTime @default(now()) @map("joined_at")
-
-  // Relations
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, userId])
   @@map("project_members")
 }
 
-// Task management (Kanban)
 model Task {
-  id               String   @id @default(cuid())
-  title            String
-  description      String?
-  status           String   @default("todo") // "todo", "in_progress", "review", "done", "cancelled"
-  priority         String   @default("medium") // "low", "medium", "high", "urgent"
-  dueDate          DateTime? @map("due_date")
-  estimatedHours   Float?   @map("estimated_hours")
-  actualHours      Float?   @map("actual_hours")
-  tags             String?  // JSON string of tags array
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
-  projectId        String   @map("project_id")
-  assignedToId     String?  @map("assigned_to_id")
-  createdById      String   @map("created_by_id")
-
-  // Relations
-  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  assignedTo User?   @relation("TaskAssignee", fields: [assignedToId], references: [id])
-  createdBy  User    @relation("TaskCreator", fields: [createdById], references: [id])
+  id             String    @id @default(cuid())
+  title          String
+  description    String?
+  status         String    @default("todo")
+  priority       String    @default("medium")
+  dueDate        DateTime? @map("due_date")
+  estimatedHours Float?    @map("estimated_hours")
+  actualHours    Float?    @map("actual_hours")
+  tags           String?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  projectId      String    @map("project_id")
+  assignedToId   String?   @map("assigned_to_id")
+  createdById    String    @map("created_by_id")
+  createdBy      User      @relation("TaskCreator", fields: [createdById], references: [id])
+  assignedTo     User?     @relation("TaskAssignee", fields: [assignedToId], references: [id])
+  project        Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@map("tasks")
 }
 
-// Gallery albums
 model Album {
   id          String   @id @default(cuid())
   name        String   @unique
@@ -131,94 +112,80 @@ model Album {
   isPrivate   Boolean  @default(false) @map("is_private")
   createdAt   DateTime @default(now()) @map("created_at")
   createdById String   @map("created_by_id")
-
-  // Relations
-  createdBy User    @relation("AlbumsCreated", fields: [createdById], references: [id])
-  images    Image[]
+  createdBy   User     @relation("AlbumsCreated", fields: [createdById], references: [id])
+  images      Image[]
 
   @@map("albums")
 }
 
-// Image storage (Cloudinary)
 model Image {
   id           String   @id @default(cuid())
   title        String
   description  String?
-  url          String   // Cloudinary URL
-  publicId     String   @map("public_id") // Cloudinary public ID
-  format       String   // jpg, png, etc.
+  url          String
+  publicId     String   @map("public_id")
+  format       String
   width        Int
   height       Int
-  fileSize     Int      @map("file_size") // file size in bytes
-  tags         String?  // JSON string of tags array
-  metadata     String?  // JSON string of additional metadata from Cloudinary
+  fileSize     Int      @map("file_size")
+  tags         String?
+  metadata     String?
   createdAt    DateTime @default(now()) @map("created_at")
   albumId      String   @map("album_id")
   uploadedById String   @map("uploaded_by_id")
-
-  // Relations
-  album      Album @relation(fields: [albumId], references: [id], onDelete: Cascade)
-  uploadedBy User  @relation("ImagesUploaded", fields: [uploadedById], references: [id])
+  uploadedBy   User     @relation("ImagesUploaded", fields: [uploadedById], references: [id])
+  album        Album    @relation(fields: [albumId], references: [id], onDelete: Cascade)
 
   @@map("images")
 }
 
-// Document storage (Cloudinary)
 model Document {
   id           String   @id @default(cuid())
   title        String
   description  String?
   originalName String   @map("original_name")
-  url          String   // Cloudinary URL
-  cloudinaryId String   @map("cloudinary_id") // Cloudinary public ID
-  fileType     String   @map("file_type") // MIME type
-  fileSize     Int      @map("file_size") // file size in bytes
-  category     String   @default("other") // "research", "report", "presentation", "protocol", "data", "other"
-  tags         String?  // JSON string of tags array
+  url          String
+  cloudinaryId String   @map("cloudinary_id")
+  fileType     String   @map("file_type")
+  fileSize     Int      @map("file_size")
+  category     String   @default("other")
+  tags         String?
   createdAt    DateTime @default(now()) @map("created_at")
   projectId    String?  @map("project_id")
   uploadedById String   @map("uploaded_by_id")
-
-  // Relations
-  project    Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  uploadedBy User     @relation("DocumentsUploaded", fields: [uploadedById], references: [id])
+  uploadedBy   User     @relation("DocumentsUploaded", fields: [uploadedById], references: [id])
+  project      Project? @relation(fields: [projectId], references: [id])
 
   @@map("documents")
 }
 
-// Calendar events
 model CalendarEvent {
-  id          String   @id @default(cuid())
+  id          String          @id @default(cuid())
   title       String
   description String?
-  startDate   DateTime @map("start_date")
-  endDate     DateTime @map("end_date")
+  startDate   DateTime        @map("start_date")
+  endDate     DateTime        @map("end_date")
   location    String?
-  type        String   @default("other") // "meeting", "deadline", "workshop", "presentation", "other"
-  isAllDay    Boolean  @default(false) @map("is_all_day")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-  projectId   String?  @map("project_id")
-  createdById String   @map("created_by_id")
-
-  // Relations
-  project   Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  createdBy User             @relation("EventCreator", fields: [createdById], references: [id])
-  attendees EventAttendee[]
+  type        String          @default("other")
+  isAllDay    Boolean         @default(false) @map("is_all_day")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+  projectId   String?         @map("project_id")
+  createdById String          @map("created_by_id")
+  createdBy   User            @relation("EventCreator", fields: [createdById], references: [id])
+  project     Project?        @relation(fields: [projectId], references: [id])
+  attendees   EventAttendee[]
 
   @@map("calendar_events")
 }
 
-// Event attendees (many-to-many)
 model EventAttendee {
-  id      String @id @default(cuid())
-  eventId String @map("event_id")
-  userId  String @map("user_id")
-  status  String @default("invited") // "invited", "accepted", "declined", "tentative"
-
-  // Relations
-  event CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  user  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id      String        @id @default(cuid())
+  eventId String        @map("event_id")
+  userId  String        @map("user_id")
+  status  String        @default("invited")
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event   CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@unique([eventId, userId])
   @@map("event_attendees")

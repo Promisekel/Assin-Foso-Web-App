@@ -82,14 +82,14 @@ router.post('/register', async (req, res) => {
     
     // Hash password
     const saltRounds = parseInt(process.env.BCRYPT_ROUNDS) || 12
-    const passwordHash = await bcrypt.hash(password, saltRounds)
+    const hashedPassword = await bcrypt.hash(password, saltRounds)
     
     // Create user
     const user = await prisma.user.create({
       data: {
         name,
         email,
-        passwordHash,
+        password: hashedPassword,
         role: invite.role
       },
       select: {
@@ -151,7 +151,7 @@ router.post('/login', async (req, res) => {
     }
     
     // Check password
-    const isValidPassword = await bcrypt.compare(password, user.passwordHash)
+    const isValidPassword = await bcrypt.compare(password, user.password)
     if (!isValidPassword) {
       return res.status(401).json({ error: 'Invalid credentials' })
     }
@@ -166,17 +166,20 @@ router.post('/login', async (req, res) => {
     const token = generateToken(user.id)
     
     res.json({
+      success: true,
       message: 'Login successful',
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        avatar: user.avatar,
-        bio: user.bio,
-        department: user.department
-      },
-      token
+      data: {
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          avatar: user.avatar,
+          bio: user.bio,
+          department: user.department
+        },
+        token
+      }
     })
     
   } catch (error) {
@@ -206,10 +209,16 @@ router.get('/me', authenticate, async (req, res) => {
     })
     
     if (!user) {
-      return res.status(404).json({ error: 'User not found' })
+      return res.status(404).json({ 
+        success: false,
+        error: 'User not found' 
+      })
     }
     
-    res.json({ user })
+    res.json({ 
+      success: true,
+      data: user
+    })
     
   } catch (error) {
     console.error('Get user error:', error)
