@@ -7,7 +7,7 @@ async function testUser() {
   try {
     // Find the admin user
     const user = await prisma.user.findUnique({
-      where: { email: 'admin@assinfoso.edu.gh' }
+      where: { email: 'admin@assinfoso-kccr.edu.gh' }
     });
     
     if (!user) {
@@ -24,7 +24,7 @@ async function testUser() {
     });
     
     // Test password
-    const testPassword = 'admin123456';
+    const testPassword = 'AssinfosKCCR2025!Admin';
     const isValid = await bcrypt.compare(testPassword, user.password);
     console.log('🔐 Password test:', isValid ? 'VALID' : 'INVALID');
     

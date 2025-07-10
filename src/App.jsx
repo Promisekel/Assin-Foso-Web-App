@@ -8,7 +8,7 @@ import { GalleryProvider } from './contexts/GalleryContext'
 import Navbar from './components/layout/Navbar'
 import Sidebar from './components/layout/Sidebar'
 import Footer from './components/layout/Footer'
-import DemoModeNotification from './components/DemoModeNotification'
+
 import FloatingActionButton from './components/FloatingActionButton'
 import ParticleBackground from './components/ParticleBackground'
 
@@ -98,7 +98,6 @@ function App() {
     <NavigationProvider>
       <GalleryProvider>
         <div className="App">
-          <DemoModeNotification />
           <Routes>
         {/* Public Routes */}
         <Route 

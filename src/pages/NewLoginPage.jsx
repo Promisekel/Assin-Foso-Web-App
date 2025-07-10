@@ -85,10 +85,10 @@ const LoginPage = () => {
             <LogIn className="h-8 w-8 text-white" style={{ display: 'none' }} />
           </div>
           <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
-            Welcome Back
+            KCCR Research Platform
           </h2>
           <p className="mt-2 text-sm text-gray-600">
-            Sign in to your research platform account
+            Infectious Disease Epidemiology Group - Assin Foso
           </p>
         </div>
 
@@ -203,12 +203,14 @@ const LoginPage = () => {
 
           {/* Production Credentials */}
           <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <h3 className="text-sm font-medium text-blue-700 mb-2">Access Credentials:</h3>
+            <h3 className="text-sm font-medium text-blue-700 mb-2">KCCR Research Platform - Production Access:</h3>
             <div className="space-y-1 text-xs text-blue-600">
               <p><strong>Administrator:</strong> admin@assinfoso-kccr.edu.gh</p>
-              <p><strong>Researcher:</strong> researcher@assinfoso-kccr.edu.gh</p>
+              <p><strong>Research Coordinator:</strong> coordinator@assinfoso-kccr.edu.gh</p>
+              <p><strong>Field Researcher:</strong> researcher@assinfoso-kccr.edu.gh</p>
+              <p><strong>Lab Technician:</strong> labtech@assinfoso-kccr.edu.gh</p>
             </div>
-            <p className="text-xs text-blue-500 mt-2">Contact your system administrator for login credentials.</p>
+            <p className="text-xs text-blue-500 mt-2 font-medium">Contact Dr. Samuel Kwame Asiedu for login credentials.</p>
           </div>
 
           {/* Sign up link */}
@@ -228,10 +230,13 @@ const LoginPage = () => {
         {/* Additional Info */}
         <div className="mt-8 text-center">
           <p className="text-xs text-gray-500">
-            Assin Foso KCCR - Infectious Disease Epidemiology Group
+            Kwame Nkrumah University of Science and Technology
           </p>
           <p className="text-xs text-gray-500 mt-1">
-            Secure research collaboration platform
+            Assin Foso KCCR - Infectious Disease Epidemiology Research Platform
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            © 2025 - Secure Research Collaboration Platform
           </p>
         </div>
       </div>

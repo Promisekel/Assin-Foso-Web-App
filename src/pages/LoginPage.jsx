@@ -190,7 +190,7 @@ const LoginPage = () => {
             <p><strong>Existing Users:</strong> Login with your email and password</p>
           </div>
           <p className="text-xs text-green-600 mt-2 italic">
-            Demo credentials are no longer active.
+            Use your institutional credentials to access the platform.
           </p>
         </div>
       </div>

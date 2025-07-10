@@ -4,21 +4,13 @@ import bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Starting database seed...');
+  console.log('🌱 Starting PRODUCTION database seed...');
 
-  // Create admin user
-  const adminPassword = await bcrypt.hash('admin123456', 12);
-  const admin = await prisma.user.upsert({
-    where: { email: 'admin@assinfoso.edu.gh' },
-    update: {},
-    create: {
-      name: 'Admin User',
-      email: 'admin@assinfoso.edu.gh',
-      password: adminPassword,
-      role: 'admin',
-      isActive: true
-    }
-  });
+  // This seed file is deprecated - use production-seed.js instead
+  console.log('⚠️  This is the old demo seed file.');
+  console.log('📋 For production, run: node prisma/production-seed.js');
+  console.log('✅ Or run the fix-login.js script for real users.');
+}
 
   console.log('✅ Created admin user:', admin.email);
 

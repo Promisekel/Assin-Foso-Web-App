@@ -76,8 +76,8 @@ if (isFirebaseConfigured) {
     console.warn("Please check your Firebase configuration")
   }
 } else {
-  console.log("🎭 Firebase running in demo mode - real authentication disabled")
-  console.log("📋 To enable production mode, add your Firebase config to .env file")
+  console.log("⚠️ Firebase configuration incomplete - some features may be disabled")
+  console.log("📋 Please verify Firebase configuration in environment variables")
 }
 
 export { auth, db, storage, analytics, isFirebaseConfigured }
