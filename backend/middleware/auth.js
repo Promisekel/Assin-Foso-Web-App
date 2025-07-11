@@ -26,9 +26,6 @@ export const authenticate = async (req, res, next) => {
         email: true,
         name: true,
         role: true,
-        avatar: true,
-        bio: true,
-        department: true,
         isActive: true,
         createdAt: true
       }
@@ -58,7 +55,7 @@ export const authenticate = async (req, res, next) => {
 }
 
 export const requireAdmin = (req, res, next) => {
-  if (req.user.role !== 'ADMIN') {
+  if (req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Access denied. Admin privileges required.' })
   }
   next()
@@ -68,7 +65,7 @@ export const requireAdminOrOwner = (userIdField = 'userId') => {
   return (req, res, next) => {
     const resourceUserId = req.params[userIdField] || req.body[userIdField]
     
-    if (req.user.role === 'ADMIN' || req.user.id === resourceUserId) {
+    if (req.user.role === 'admin' || req.user.id === resourceUserId) {
       next()
     } else {
       res.status(403).json({ error: 'Access denied. Insufficient privileges.' })
