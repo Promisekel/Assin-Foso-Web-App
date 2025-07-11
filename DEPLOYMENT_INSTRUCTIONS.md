@@ -27,9 +27,11 @@ DATABASE_URL=postgresql://neondb_owner:npg_anZ1B2UluseH@ep-broad-sun-a9qej5ml-po
 JWT_SECRET=assin-foso-research-platform-2025-production-secure-jwt-secret-key-256-bits-random
 CLOUDINARY_CLOUD_NAME=dwwbegf2y
 CLOUDINARY_API_KEY=416313624663736
-CLOUDINARY_API_SECRET=your_actual_api_secret
+CLOUDINARY_API_SECRET=hyJxqiguS3y0IZjaodpT-BR43DU
+CLOUDINARY_URL=cloudinary://416313624663736:hyJxqiguS3y0IZjaodpT-BR43DU@dwwbegf2y
 NODE_ENV=production
 PORT=5000
+FRONTEND_URL=https://assinfoso-kccr-research.netlify.app
 ```
 
 4. **Railway will provide a URL like:**
